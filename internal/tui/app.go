@@ -41,7 +41,8 @@ type Deps struct {
 	Cfg       config.Config
 	Store     *store.DB
 	Nominatim *providers.Nominatim
-	Overpass  *providers.Overpass
+	Overpass  *providers.Overpass // used by POI category fetches and as MapSource fallback
+	MapSource providers.MapSource // PMTiles or Overpass — picked by config
 	OSRM      *providers.OSRM
 	TomTom    *providers.TomTom // nil when no API key is configured
 }
@@ -542,10 +543,12 @@ func (a *App) recomputeViewport() {
 }
 
 func (a *App) refreshLayers() tea.Cmd {
-	if a.deps.Overpass == nil {
+	if a.deps.MapSource == nil {
 		return nil
 	}
-	return fetchMapLayers(a.bgCtx, a.deps.Overpass, a.viewport.BBox().Expand(0.001, 0.001), a.viewport.Zoom)
+	_, isPMTiles := a.deps.MapSource.(*providers.PMTilesSource)
+	bbox := a.viewport.BBox().Expand(0.001, 0.001)
+	return fetchMapLayers(a.bgCtx, a.deps.MapSource, bbox, a.viewport.Zoom, isPMTiles)
 }
 
 func (a *App) addBookmark() tea.Cmd {

@@ -40,14 +40,16 @@ func renderMap(v Viewport, theme render.Theme, ascii bool, fc data.FeatureCollec
 	return c.String()
 }
 
-// fetchMapLayers schedules an Overpass request for the current viewport.
-//
-// Below zoom 11 the bbox is too large to query Overpass synchronously
-// without rate-limiting both us and the public endpoint, so we return an
-// empty result. The bbox at z11 over a temperate latitude is roughly
-// 40×30 km — already at the edge of what Overpass treats as "small".
-func fetchMapLayers(ctx context.Context, o *providers.Overpass, b geo.BBox, zoom int) tea.Cmd {
-	if zoom < 11 {
+// fetchMapLayers schedules a fetch from the configured [providers.MapSource].
+// PMTiles is range-fetched (no minimum-zoom cliff) while Overpass is
+// gated below z11 to avoid continent-sized queries that always time out.
+func fetchMapLayers(ctx context.Context, src providers.MapSource, b geo.BBox, zoom int, isPMTiles bool) tea.Cmd {
+	if src == nil {
+		return func() tea.Msg {
+			return featuresLoadedMsg{collection: data.FeatureCollection{}}
+		}
+	}
+	if !isPMTiles && zoom < 11 {
 		return func() tea.Msg {
 			return featuresLoadedMsg{collection: data.FeatureCollection{}}
 		}
@@ -55,7 +57,7 @@ func fetchMapLayers(ctx context.Context, o *providers.Overpass, b geo.BBox, zoom
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
-		fc, err := o.FetchMapLayers(ctx, b, zoom)
+		fc, err := src.FetchMapLayers(ctx, b, zoom)
 		return featuresLoadedMsg{collection: fc, err: err}
 	}
 }

@@ -144,11 +144,32 @@ func run(ctx context.Context, f flags) error {
 		}
 	}
 
+	// MapSource: PMTiles takes precedence when configured. The
+	// archive is opened eagerly so the user gets a quick failure
+	// rather than a silent fallback at the first pan.
+	var mapSource providers.MapSource = overpass
+	if url := cfg.Providers.PMTilesURL; url != "" {
+		ctxBoot, cancelBoot := context.WithTimeout(ctx, 10*time.Second)
+		archive, err := providers.NewPMTiles(ctxBoot, httpClient, url)
+		cancelBoot()
+		if err != nil {
+			logger.Warn("pmtiles unavailable; falling back to overpass", "err", err)
+		} else {
+			defer func() { _ = archive.Close() }()
+			mapSource = providers.NewPMTilesSource(archive, 64)
+			logger.Info("pmtiles source ready",
+				"url", url,
+				"min_zoom", archive.Header().MinZoom,
+				"max_zoom", archive.Header().MaxZoom)
+		}
+	}
+
 	deps := tui.Deps{
 		Cfg:       cfg,
 		Store:     db,
 		Nominatim: providers.NewNominatim(httpClient, cfg.Providers.NominatimURL),
 		Overpass:  overpass,
+		MapSource: mapSource,
 		OSRM:      providers.NewOSRM(httpClient, cfg.Providers.OSRMURL),
 		TomTom:    providers.NewTomTom(httpClient, cfg.Providers.TomTomURL, cfg.Providers.TomTomAPIKey),
 	}

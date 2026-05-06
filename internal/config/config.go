@@ -45,6 +45,12 @@ type Providers struct {
 	TomTomURL    string `mapstructure:"tomtom_url"`
 	TomTomAPIKey string `mapstructure:"tomtom_api_key"`
 
+	// PMTilesURL points to a Protomaps PMTiles archive (HTTP URL or
+	// local file path). When set, vector tiles from this archive are
+	// used as the map source instead of Overpass — orders of magnitude
+	// faster and works offline once the file is local.
+	PMTilesURL string `mapstructure:"pmtiles_url"`
+
 	Rate ProvidersRate `mapstructure:"rate"`
 }
 
@@ -175,6 +181,7 @@ func bindDefaults(v *viper.Viper, cfg Config) {
 	v.SetDefault("providers.tile_url", cfg.Providers.TileURL)
 	v.SetDefault("providers.tomtom_url", cfg.Providers.TomTomURL)
 	v.SetDefault("providers.tomtom_api_key", cfg.Providers.TomTomAPIKey)
+	v.SetDefault("providers.pmtiles_url", cfg.Providers.PMTilesURL)
 	v.SetDefault("providers.rate.nominatim_rps", cfg.Providers.Rate.NominatimRPS)
 	v.SetDefault("providers.rate.overpass_rps", cfg.Providers.Rate.OverpassRPS)
 	v.SetDefault("providers.rate.osrm_rps", cfg.Providers.Rate.OSRMRPS)

@@ -22,9 +22,9 @@ colour. No GUI, no GPU, no telemetry.
 
 ## Features
 
-- **Vector map rendering** — Overpass features rasterised onto a Braille
-  canvas with layered colour priorities (water → green → buildings →
-  roads → POIs → route → markers).
+- **Vector map rendering** — Protomaps PMTiles (preferred, fast, offline-capable)
+  or Overpass features rasterised onto a Braille canvas with layered
+  colour priorities (water → green → buildings → roads → POIs → route → markers).
 - **Search** — Nominatim with debounced typing, history, and viewport
   centering on confirm.
 - **Points of interest** — 11 categories with Unicode glyphs (🍽 ☕ 🏥 💊
@@ -119,6 +119,13 @@ osrm_url        = "https://router.project-osrm.org/"
 osrm_profile    = "driving"
 tomtom_url      = "https://api.tomtom.com"
 tomtom_api_key  = ""                       # paste your free TomTom dev key to enable traffic
+
+# Vector tiles (Protomaps PMTiles). When set, used as the map source
+# instead of Overpass — way faster, less flaky, works fully offline once
+# the file is local. Accepts http(s)://, file://, or a plain path.
+# Generate a regional extract with the `pmtiles` CLI:
+#   pmtiles extract https://build.protomaps.com/20260101.pmtiles aquitaine.pmtiles --bbox=-1,44,0,45
+pmtiles_url     = ""
 
 [providers.rate]
 nominatim_rps = 1.0

@@ -45,6 +45,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Real-time traffic** (`T`): TomTom Traffic Incidents v5 overlay,
   refreshed every 60s while enabled. Requires a free dev API key in
   `providers.tomtom_api_key`.
+- **Protomaps PMTiles** map source: zero-dep custom protobuf decoder
+  (internal/pbf) + PMTiles v3 reader (HTTP range or local file) + MVT
+  decoder. When `providers.pmtiles_url` is set, vector tiles are used
+  instead of Overpass — much faster, no rate limits, works offline.
+  Tile schema mapped from Protomaps basemap conventions to OSM-style
+  tags so the existing renderer needs no special-casing.
 
 ### Changed
 
