@@ -28,10 +28,28 @@ the help screen and the update loop never drift apart.
 
 ## Bookmarks
 
-| Key   | Action                                        |
-| ----- | --------------------------------------------- |
-| `f`   | Bookmark the current map centre               |
-| `F`   | List bookmarks (TODO: list overlay)           |
+| Key   | Action                                                              |
+| ----- | ------------------------------------------------------------------- |
+| `f`   | Bookmark the current map centre                                     |
+| `F`   | List bookmarks (`Enter` centre · `d` delete · `Esc` close)          |
+
+## Distance ruler (`m`)
+
+| Key      | Action                                       |
+| -------- | -------------------------------------------- |
+| `Space`  | Add the current centre to the polyline       |
+| `u`      | Undo the last point                          |
+| `c`      | Clear the polyline                           |
+| `Esc`    | Return to NORMAL                             |
+
+## GPS follow (`G`)
+
+| Key   | Action                                                |
+| ----- | ----------------------------------------------------- |
+| `G`   | Toggle GPS-follow mode (gpsd at `127.0.0.1:2947`)     |
+
+While follow mode is on, the viewport recentres on the latest fix every
+two seconds. Disable by pressing `G` again.
 
 ## Search mode (`/`)
 

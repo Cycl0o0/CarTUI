@@ -39,8 +39,14 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # We restrict coverage to internal/... — covering the cmd main
+      # package triggers the new GOCOVERDIR coverage path which needs
+      # the `covdata` tool, not always present in setup-go's default
+      # Go 1.22 install.
       - name: Test
-        run: go test -race -count=1 -coverprofile=coverage.out ./...
+        run: |
+          go test -race -count=1 ./...
+          go test -race -count=1 -coverprofile=coverage.out ./internal/...
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go == '1.23'

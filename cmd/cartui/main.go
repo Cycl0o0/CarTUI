@@ -74,6 +74,7 @@ func newRootCmd() *cobra.Command {
 	cmd.Flags().StringVar(&f.gotoQuery, "goto", "", "geocode this string and centre on the first result before launching")
 	cmd.Flags().BoolVarP(&f.versionOut, "version", "V", false, "print version and exit")
 	cmd.AddCommand(newVersionCmd())
+	cmd.AddCommand(newPrefetchCmd())
 	return cmd
 }
 

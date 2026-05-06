@@ -31,6 +31,8 @@ const (
 	ModeRoute
 	ModePOI
 	ModeHelp
+	ModeMeasure
+	ModeBookmarks
 )
 
 // Deps groups every dependency the [App] needs. Each is optional in tests —
@@ -63,9 +65,12 @@ type App struct {
 	markers  []geo.LatLng
 	route    *data.Route
 
-	search searchModel
-	poi    poiModel
-	rt     routeModel
+	search    searchModel
+	poi       poiModel
+	rt        routeModel
+	measure   measureModel
+	bookmarks bookmarkModel
+	gps       gpsState
 
 	notification    string
 	notificationExp time.Time
@@ -97,10 +102,11 @@ func New(deps Deps) *App {
 		ascii:    !deps.Cfg.Map.Braille,
 		mode:     ModeNormal,
 		viewport: Viewport{Center: center, Zoom: zoom},
-		search:   newSearchModel(t),
-		poi:      newPOIModel(t),
-		rt:       newRouteModel(),
-		sidebar:  deps.Cfg.UI.Sidebar,
+		search:    newSearchModel(t),
+		poi:       newPOIModel(t),
+		rt:        newRouteModel(),
+		bookmarks: newBookmarkModel(t),
+		sidebar:   deps.Cfg.UI.Sidebar,
 		bgCtx:    context.Background(),
 	}
 }
@@ -193,6 +199,19 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.search.loading = true
 		return a, fetchResults(a.bgCtx, a.deps.Nominatim, m.query, a.deps.Cfg.UI.Lang)
 
+	case gpsFixMsg:
+		if m.err != nil {
+			return a, tea.Batch(a.notify("GPS: "+m.err.Error()), a.rescheduleGPS())
+		}
+		a.applyFix(m.fix)
+		return a, tea.Batch(a.refreshLayers(), a.rescheduleGPS())
+
+	case gpsTickMsg:
+		if !a.gps.enabled {
+			return a, nil
+		}
+		return a, pollGPS(a.bgCtx)
+
 	case tea.KeyMsg:
 		return a.handleKey(m)
 	}
@@ -218,6 +237,10 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a.handleRouteKey(msg)
 	case ModeHelp:
 		return a.handleHelpKey(msg)
+	case ModeMeasure:
+		return a.handleMeasureKey(msg)
+	case ModeBookmarks:
+		return a.handleBookmarkKey(msg)
 	}
 	return a.handleNormalKey(msg)
 }
@@ -273,6 +296,18 @@ func (a *App) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case keyMatch(a.keys.AddBookmark, msg):
 		return a, a.addBookmark()
+	case keyMatch(a.keys.ListBookmark, msg):
+		if a.deps.Store != nil {
+			items, _ := a.deps.Store.ListBookmarks()
+			a.bookmarks.refresh(items)
+		}
+		a.mode = ModeBookmarks
+		return a, nil
+	case msg.String() == "m":
+		a.mode = ModeMeasure
+		return a, nil
+	case msg.String() == "G":
+		return a, a.startGPS()
 	}
 	a.prevKey = msg.String()
 	return a, nil
@@ -379,7 +414,7 @@ func (a *App) View() string {
 		bodyHeight = 1
 	}
 
-	mapStr := renderMap(a.viewport, a.theme, a.ascii, a.features, a.route, a.markers)
+	mapStr := renderMap(a.viewport, a.theme, a.ascii, a.features, a.pois, a.route, a.markers, a.measure.points)
 
 	body := mapStr
 	if a.sidebar {
@@ -398,6 +433,10 @@ func (a *App) View() string {
 		out = overlay(out, a.rt.View(min(60, a.width-4), a.t))
 	case ModeHelp:
 		out = overlay(out, helpView(min(70, a.width-4), a.t, a.keys))
+	case ModeMeasure:
+		out = overlay(out, a.measure.View(min(60, a.width-4), a.t))
+	case ModeBookmarks:
+		out = overlay(out, a.bookmarks.View(min(60, a.width-4), a.t))
 	}
 	return out
 }

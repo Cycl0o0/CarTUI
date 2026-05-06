@@ -31,17 +31,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   build, test (race + coverage) and golangci-lint.
 - GoReleaser configuration for Linux/macOS/Windows × amd64/arm64.
 
+### Added (bonus features)
+
+- **Distance ruler** (`m` mode): chain points at the centre, get
+  cumulative haversine distance with undo / clear.
+- **Bookmarks overlay** (`F`): list, centre, delete bookmarks.
+- **gpsd / follow-me** (`G`): connect to a local gpsd at
+  `127.0.0.1:2947`, recentre on each fix every 2 seconds.
+- **Offline prefetch** subcommand: `cartui prefetch --bbox … --zoom …`
+  warms the raster tile cache for fully-offline browsing later.
+
+### Fixed
+
+- Skip Overpass fetches below zoom 11 — over a continent-sized bbox
+  the public endpoint reliably timed out. Client timeout brought down
+  from 30s to 20s to surface failures earlier.
+- CI coverage profiling restricted to `internal/...` to avoid the
+  GOCOVERDIR `covdata` tool requirement on the Go 1.22 runner.
+
 ### Future
 
-These bonus features from the original brief ship as TODO and welcome
-PRs:
+Out of scope for this release; PRs welcome:
 
-- Distance-measurement multi-point ruler.
 - Heatmap of POI density per zoom.
 - Mapillary Street-View → ASCII art viewer.
 - Bookmark sync via WebDAV / Nextcloud.
 - Real-time traffic overlays (TomTom or HERE).
-- Local `gpsd` integration and a "follow me" recentring mode.
-- Pre-downloaded offline bbox tile sets.
-- Listable bookmarks overlay with full delete / rename UX.
 - Configurable keymap from `config.toml`.

@@ -15,20 +15,32 @@ import (
 )
 
 // renderMap composes the canvas for the current viewport.
-func renderMap(v Viewport, theme render.Theme, ascii bool, fc data.FeatureCollection, route *data.Route, markers []geo.LatLng) string {
+func renderMap(v Viewport, theme render.Theme, ascii bool, fc data.FeatureCollection, pois data.FeatureCollection, route *data.Route, markers []geo.LatLng, measurePoints []geo.LatLng) string {
 	w, h := v.PixelDims()
 	c := render.NewCanvas(w, h, theme)
 	c.SetASCII(ascii)
 	drawFeatures(c, v, fc)
+	drawFeatures(c, v, pois)
 	drawRoute(c, v, route)
+	drawMeasurePolyline(c, v, measurePoints)
 	drawMarkers(c, v, markers)
 	return c.String()
 }
 
 // fetchMapLayers schedules an Overpass request for the current viewport.
+//
+// Below zoom 11 the bbox is too large to query Overpass synchronously
+// without rate-limiting both us and the public endpoint, so we return an
+// empty result. The bbox at z11 over a temperate latitude is roughly
+// 40×30 km — already at the edge of what Overpass treats as "small".
 func fetchMapLayers(ctx context.Context, o *providers.Overpass, b geo.BBox, zoom int) tea.Cmd {
+	if zoom < 11 {
+		return func() tea.Msg {
+			return featuresLoadedMsg{collection: data.FeatureCollection{}}
+		}
+	}
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 		fc, err := o.FetchMapLayers(ctx, b, zoom)
 		return featuresLoadedMsg{collection: fc, err: err}

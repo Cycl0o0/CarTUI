@@ -82,6 +82,11 @@ func (d *DB) Close() error {
 // Path returns the on-disk location of the database file.
 func (d *DB) Path() string { return d.path }
 
+// Bolt returns the underlying Bolt handle. Exposed so packages such as
+// `tiles` can attach their own buckets to the same on-disk file without a
+// second connection.
+func (d *DB) Bolt() *bolt.DB { return d.bolt }
+
 // DefaultPath builds the OS-appropriate default database path.
 func DefaultPath() (string, error) {
 	if env := os.Getenv("XDG_CACHE_HOME"); env != "" {
