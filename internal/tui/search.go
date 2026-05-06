@@ -20,9 +20,9 @@ const debounceWindow = 300 * time.Millisecond
 
 // searchModel is the view-state for the search overlay.
 type searchModel struct {
-	input    textinput.Model
-	results  list.Model
-	loading  bool
+	input      textinput.Model
+	results    list.Model
+	loading    bool
 	debounceID int // monotonic id used to ignore stale debounced results
 }
 

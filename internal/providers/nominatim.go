@@ -37,9 +37,9 @@ func NewNominatim(c *Client, baseURL string) *Nominatim {
 
 // SearchOptions tunes a [Nominatim.Search] call.
 type SearchOptions struct {
-	Limit         int     // max results (1..50, default 10)
-	CountryCode   string  // ISO 3166-1 alpha2, comma-separated for multiple
-	Language      string  // RFC 1766 lang tag for `accept-language` header
+	Limit         int    // max results (1..50, default 10)
+	CountryCode   string // ISO 3166-1 alpha2, comma-separated for multiple
+	Language      string // RFC 1766 lang tag for `accept-language` header
 	BoundedToBBox *geo.BBox
 }
 

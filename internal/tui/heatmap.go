@@ -38,10 +38,10 @@ func drawHeatmap(c *render.Canvas, v Viewport, pois data.FeatureCollection) {
 		// Diffuse a small portion to the four orthogonal neighbours so
 		// adjacent clusters merge visually.
 		counts[cy*w+cx] += 4
-		incr(counts, w, h, cx-1, cy, 1)
-		incr(counts, w, h, cx+1, cy, 1)
-		incr(counts, w, h, cx, cy-1, 1)
-		incr(counts, w, h, cx, cy+1, 1)
+		incr(counts, w, h, cx-1, cy)
+		incr(counts, w, h, cx+1, cy)
+		incr(counts, w, h, cx, cy-1)
+		incr(counts, w, h, cx, cy+1)
 		if v := counts[cy*w+cx]; v > maxCount {
 			maxCount = v
 		}
@@ -66,12 +66,12 @@ func drawHeatmap(c *render.Canvas, v Viewport, pois data.FeatureCollection) {
 	}
 }
 
-// incr safely increments counts[cy*w+cx] when (cx, cy) is in bounds.
-func incr(counts []int, w, h, cx, cy, by int) {
+// incr safely increments counts[cy*w+cx] by 1 when (cx, cy) is in bounds.
+func incr(counts []int, w, h, cx, cy int) {
 	if cx < 0 || cy < 0 || cx >= w || cy >= h {
 		return
 	}
-	counts[cy*w+cx] += by
+	counts[cy*w+cx]++
 }
 
 // dotsForIntensity picks a Braille dot pattern whose dot count grows with

@@ -50,7 +50,7 @@ func Open(path string) (*DB, error) {
 			return nil, err
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("create store dir: %w", err)
 	}
 	bdb, err := bolt.Open(path, 0o600, &bolt.Options{Timeout: 2 * time.Second})

@@ -104,19 +104,19 @@ func New(deps Deps) *App {
 	}
 
 	return &App{
-		deps:     deps,
-		keys:     DefaultKeymap(),
-		t:        t,
-		theme:    theme,
-		ascii:    !deps.Cfg.Map.Braille,
-		mode:     ModeNormal,
-		viewport: Viewport{Center: center, Zoom: zoom},
+		deps:      deps,
+		keys:      DefaultKeymap(),
+		t:         t,
+		theme:     theme,
+		ascii:     !deps.Cfg.Map.Braille,
+		mode:      ModeNormal,
+		viewport:  Viewport{Center: center, Zoom: zoom},
 		search:    newSearchModel(t),
 		poi:       newPOIModel(t),
 		rt:        newRouteModel(),
 		bookmarks: newBookmarkModel(t),
 		sidebar:   deps.Cfg.UI.Sidebar,
-		bgCtx:    context.Background(),
+		bgCtx:     context.Background(),
 	}
 }
 

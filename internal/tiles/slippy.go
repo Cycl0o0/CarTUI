@@ -60,13 +60,13 @@ func CoveringTiles(b geo.BBox, zoom int) []Address {
 
 // replace is a tiny strings.Replace alias kept local to avoid pulling the
 // import only for one call site.
-func replace(s, old, new string) string {
+func replace(s, oldStr, newStr string) string {
 	out := make([]byte, 0, len(s))
 	i := 0
-	for i+len(old) <= len(s) {
-		if s[i:i+len(old)] == old {
-			out = append(out, new...)
-			i += len(old)
+	for i+len(oldStr) <= len(s) {
+		if s[i:i+len(oldStr)] == oldStr {
+			out = append(out, newStr...)
+			i += len(oldStr)
 			continue
 		}
 		out = append(out, s[i])

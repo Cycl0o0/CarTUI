@@ -32,7 +32,7 @@ type Route struct {
 // RouteStep is a single turn-by-turn instruction.
 type RouteStep struct {
 	Instruction string
-	Distance    float64       // metres
+	Distance    float64 // metres
 	Duration    time.Duration
 	Geometry    []geo.LatLng
 }

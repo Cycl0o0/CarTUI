@@ -16,10 +16,13 @@ linters:
     - staticcheck
     - ineffassign
     - govet
-    - misspell
     - bodyclose
     - errorlint
     - prealloc
+
+  # `misspell` is disabled because the codebase mixes French and English
+  # strings and the linter only knows en-US dictionaries — flagging
+  # "Trafic" / "Couleur" as typos is noise.
 
   settings:
     revive:
@@ -38,16 +41,24 @@ linters:
           disabled: true
     gosec:
       excludes:
-        - G104
-        - G304
+        - G104  # unhandled errors (covered by errcheck)
+        - G304  # potential file inclusion via variable (false positives in TUI)
+        - G115  # integer overflow (intentional Unix-time encoding in store/bookmarks.go)
     gocritic:
       enabled-tags:
         - diagnostic
         - performance
-        - style
       disabled-checks:
         - hugeParam
         - rangeValCopy
+        # `evalOrder` warns whenever we call a function in a return
+        # statement — but Bubble Tea idioms (`return model, cmd`)
+        # routinely construct the cmd inline. Suppress globally rather
+        # than forcing a temporary variable on every reducer.
+        - evalOrder
+        # The `style` group is otherwise disabled because
+        # paramTypeCombine / unnamedResult / singleCaseSwitch all warn
+        # on patterns we deliberately keep.
 
   exclusions:
     rules:

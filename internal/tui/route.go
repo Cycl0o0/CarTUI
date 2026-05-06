@@ -121,5 +121,5 @@ func exportGPX(r *data.Route, name, path string) error {
 		path = "cartui-route.gpx"
 	}
 	gpx := providers.ToGPX(*r, name)
-	return os.WriteFile(path, []byte(gpx), 0o644)
+	return os.WriteFile(path, []byte(gpx), 0o600)
 }

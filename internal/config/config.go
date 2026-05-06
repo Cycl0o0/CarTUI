@@ -7,6 +7,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,7 +58,7 @@ type ProvidersRate struct {
 
 // Cache holds time-to-live values for cached resources.
 type Cache struct {
-	TileTTLHours        int `mapstructure:"tile_ttl_hours"`
+	TileTTLHours       int `mapstructure:"tile_ttl_hours"`
 	OverpassTTLMinutes int `mapstructure:"overpass_ttl_minutes"`
 }
 
@@ -145,7 +146,7 @@ func Load(path string) (Config, error) {
 	}
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
-		if !asConfigNotFound(err, &notFound) {
+		if !errors.As(err, &notFound) {
 			// Genuine parse/read error: surface it.
 			return Config{}, fmt.Errorf("read config: %w", err)
 		}
@@ -155,20 +156,6 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("unmarshal config: %w", err)
 	}
 	return cfg, nil
-}
-
-// asConfigNotFound is a tiny shim for errors.As against viper's typed
-// "config file not found" error. Returning a typed bool keeps the error
-// chain inspection short.
-func asConfigNotFound(err error, target *viper.ConfigFileNotFoundError) bool {
-	if err == nil {
-		return false
-	}
-	if t, ok := err.(viper.ConfigFileNotFoundError); ok {
-		*target = t
-		return true
-	}
-	return false
 }
 
 // bindDefaults seeds Viper with the defaults so AutomaticEnv resolution sees

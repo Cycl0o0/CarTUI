@@ -220,7 +220,7 @@ func buildLogger(file, level string) (*slog.Logger, func(), error) {
 		// corrupt the terminal output.
 		return slog.New(slog.NewTextHandler(discardWriter{}, &slog.HandlerOptions{Level: lvl})), func() {}, nil
 	}
-	w, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	w, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open log: %w", err)
 	}

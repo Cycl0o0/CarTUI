@@ -25,9 +25,9 @@ func Haversine(a, b LatLng) float64 {
 
 // WGS84 ellipsoid parameters used by [Vincenty].
 const (
-	wgs84A = 6378137.0           // semi-major axis (m)
-	wgs84B = 6356752.314245      // semi-minor axis (m)
-	wgs84F = 1 / 298.257223563   // flattening
+	wgs84A = 6378137.0         // semi-major axis (m)
+	wgs84B = 6356752.314245    // semi-minor axis (m)
+	wgs84F = 1 / 298.257223563 // flattening
 )
 
 // Vincenty returns the geodesic distance between two coordinates, in metres,

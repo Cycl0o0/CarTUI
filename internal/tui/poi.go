@@ -5,7 +5,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -20,7 +19,6 @@ import (
 // poiModel holds the state for the POI category selector.
 type poiModel struct {
 	categories list.Model
-	selected   data.POICategory
 	loading    bool
 }
 
@@ -93,32 +91,4 @@ func fetchPOIs(ctx context.Context, o *providers.Overpass, b geo.BBox, cats []da
 		fc, err := o.FetchPOIs(ctx, b, cats)
 		return poisLoadedMsg{collection: fc, err: err}
 	}
-}
-
-// formatPOIDetails renders a POI in the side panel.
-func formatPOIDetails(p data.POI, t i18n.Strings) string {
-	bullet := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6FB3"))
-	var rows []string
-	rows = append(rows, lipgloss.NewStyle().Bold(true).Render(p.Name))
-	rows = append(rows, fmt.Sprintf("%s %s", bullet.Render("•"), p.Category.String()))
-	if p.Address != "" {
-		rows = append(rows, fmt.Sprintf("%s %s", bullet.Render("@"), p.Address))
-	}
-	if p.Phone != "" {
-		rows = append(rows, fmt.Sprintf("%s %s", bullet.Render("☎"), p.Phone))
-	}
-	if p.Website != "" {
-		rows = append(rows, fmt.Sprintf("%s %s", bullet.Render("⌘"), p.Website))
-	}
-	if p.Hours != "" {
-		rows = append(rows, fmt.Sprintf("%s %s", bullet.Render("⌚"), data.FormatHours(p.Hours)))
-	}
-	rows = append(rows, "")
-	rows = append(rows, lipgloss.NewStyle().Faint(true).Render(p.Position.String()))
-	_ = t
-	out := ""
-	for _, r := range rows {
-		out += r + "\n"
-	}
-	return out
 }

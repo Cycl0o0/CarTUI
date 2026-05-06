@@ -133,13 +133,13 @@ func (t *TomTom) Incidents(ctx context.Context, b geo.BBox, lang string) ([]Inci
 	return out, nil
 }
 
-// FlowAtPoint returns the current speed and free-flow speed at a single
-// coordinate. Useful to spot-check whether a road is congested.
+// Flow describes the current vs free-flow conditions at a single point —
+// the response shape of [TomTom.FlowAtPoint].
 type Flow struct {
-	CurrentSpeed   float64 // km/h
-	FreeFlowSpeed  float64 // km/h
-	Confidence     float64 // 0..1
-	RoadClosure    bool
+	CurrentSpeed  float64 // km/h
+	FreeFlowSpeed float64 // km/h
+	Confidence    float64 // 0..1
+	RoadClosure   bool
 }
 
 // FlowAtPoint queries the Flow Segment Data API.
@@ -220,19 +220,20 @@ func pointFromAny(p any) (geo.LatLng, bool) {
 // flattenLine accepts either a LineString ([]Point) or a MultiLineString
 // ([][]Point) and returns a flat polyline.
 func flattenLine(raw []any) []geo.LatLng {
-	var out []geo.LatLng
+	out := make([]geo.LatLng, 0, len(raw))
 	for _, item := range raw {
-		switch v := item.(type) {
-		case []any:
-			// Could be a Point or another nested line.
-			if p, ok := pointFromAny(v); ok {
-				out = append(out, p)
-				continue
-			}
-			for _, p := range v {
-				if pt, ok := pointFromAny(p); ok {
-					out = append(out, pt)
-				}
+		v, ok := item.([]any)
+		if !ok {
+			continue
+		}
+		// Could be a Point or another nested line.
+		if p, ok := pointFromAny(v); ok {
+			out = append(out, p)
+			continue
+		}
+		for _, p := range v {
+			if pt, ok := pointFromAny(p); ok {
+				out = append(out, pt)
 			}
 		}
 	}

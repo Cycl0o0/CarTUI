@@ -6,11 +6,11 @@ package providers
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"strings"
 	"time"
@@ -157,10 +157,13 @@ func (o *Overpass) postRaw(ctx context.Context, endpoint string, headers map[str
 	return buf.Bytes(), nil
 }
 
-// cacheKey returns a deterministic key for an Overpass query body.
+// cacheKey returns a deterministic key for an Overpass query body. FNV is
+// fine here — the key is not security-sensitive, just a non-colliding
+// identifier for the BoltDB bucket.
 func cacheKey(query string) string {
-	sum := sha1.Sum([]byte(query))
-	return "overpass:" + hex.EncodeToString(sum[:])
+	h := fnv.New128a()
+	_, _ = h.Write([]byte(query))
+	return "overpass:" + hex.EncodeToString(h.Sum(nil))
 }
 
 // FetchMapLayers asks Overpass for everything CarTUI needs to render a
@@ -216,10 +219,9 @@ func buildLayersQuery(zoom int) string {
 // An empty slice is treated as "all categories".
 func buildPOIQuery(cats []data.POICategory) string {
 	tags := poiTagFilters(cats)
-	statements := make([]string, 0, len(tags))
+	statements := make([]string, 0, len(tags)*2)
 	for _, f := range tags {
-		statements = append(statements, "node"+f+";")
-		statements = append(statements, "way"+f+";")
+		statements = append(statements, "node"+f+";", "way"+f+";")
 	}
 	if len(statements) == 0 {
 		statements = append(statements, `node["amenity"];`)

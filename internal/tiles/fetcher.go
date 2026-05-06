@@ -49,7 +49,7 @@ func (f *Fetcher) Fetch(ctx context.Context, a Address) ([]byte, error) {
 	}
 
 	url := a.URL(f.urlTemplate)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("tile request: %w", err)
 	}

@@ -84,11 +84,11 @@ func (a *App) renderSidebar(height, width int) string {
 	if len(a.pois.Features) > 0 {
 		sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6FB3")).Render(a.t.POI))
 		sb.WriteString("\n")
-		max := 8
-		if len(a.pois.Features) < max {
-			max = len(a.pois.Features)
+		limit := 8
+		if len(a.pois.Features) < limit {
+			limit = len(a.pois.Features)
 		}
-		for _, f := range a.pois.Features[:max] {
+		for _, f := range a.pois.Features[:limit] {
 			cat := data.CategorizePOI(f.Tags)
 			name := f.Name
 			if name == "" {
@@ -96,8 +96,8 @@ func (a *App) renderSidebar(height, width int) string {
 			}
 			sb.WriteString(fmt.Sprintf("%s %s\n", string(cat.Glyph()), truncate(name, width-4)))
 		}
-		if len(a.pois.Features) > max {
-			sb.WriteString(lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(+%d)\n", len(a.pois.Features)-max)))
+		if len(a.pois.Features) > limit {
+			sb.WriteString(lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(+%d)\n", len(a.pois.Features)-limit)))
 		}
 	}
 
@@ -128,8 +128,9 @@ func modeLabel(m Mode, t i18n.Strings) string {
 
 // compactKeyHelp builds a one-line help string for the footer.
 func compactKeyHelp(k Keymap) string {
-	var parts []string
-	for _, b := range k.ShortHelp() {
+	short := k.ShortHelp()
+	parts := make([]string, 0, len(short))
+	for _, b := range short {
 		h := b.Help()
 		if h.Key == "" {
 			continue
@@ -171,12 +172,4 @@ func truncate(s string, maxLen int) string {
 		return string(r[:maxLen])
 	}
 	return string(r[:maxLen-1]) + "…"
-}
-
-// min returns the smaller of two ints.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

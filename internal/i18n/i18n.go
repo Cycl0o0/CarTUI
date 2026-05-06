@@ -47,18 +47,18 @@ type Strings struct {
 	NoRoute     string
 	GPXExported string
 
-	POI            string
-	Restaurant     string
-	Cafe           string
-	Hospital       string
-	Pharmacy       string
-	School         string
-	Transport      string
-	Accommodation  string
-	Shopping       string
-	Culture        string
-	Sport          string
-	PublicService  string
+	POI           string
+	Restaurant    string
+	Cafe          string
+	Hospital      string
+	Pharmacy      string
+	School        string
+	Transport     string
+	Accommodation string
+	Shopping      string
+	Culture       string
+	Sport         string
+	PublicService string
 
 	HelpTitle string
 	Quit      string
