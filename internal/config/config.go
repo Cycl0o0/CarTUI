@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 Cycl0o0 <contact@example.com>
+// SPDX-FileCopyrightText: 2026 Cycl0o0 <contact@cyclooo.fr>
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package config wires Viper to the CarTUI options. It exposes a single
