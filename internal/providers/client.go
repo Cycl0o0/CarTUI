@@ -8,6 +8,7 @@
 package providers
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -213,6 +214,40 @@ func (c *Client) RequestJSON(ctx context.Context, method, url string, headers ma
 		return nil
 	}
 	return decodeJSON(reader, out)
+}
+
+// RequestRaw is like [Client.RequestJSON] but writes the (decompressed)
+// response body verbatim into out. Useful when the caller wants to cache
+// the bytes alongside the parsed value.
+//
+// Body size is capped at 32 MiB to avoid unbounded buffering.
+func (c *Client) RequestRaw(ctx context.Context, method, url string, headers map[string]string, body io.Reader, out *bytes.Buffer) error {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer drain(resp)
+
+	reader, err := decompress(resp)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		buf, _ := io.ReadAll(io.LimitReader(reader, 1<<10))
+		return fmt.Errorf("upstream %s: %s: %s", req.URL.Host, resp.Status, string(buf))
+	}
+	const maxBody = 32 << 20
+	if _, err := io.Copy(out, io.LimitReader(reader, maxBody)); err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	return nil
 }
 
 // shouldRetry reports whether an error or status code is transient and worth

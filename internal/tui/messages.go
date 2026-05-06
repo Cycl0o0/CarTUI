@@ -48,3 +48,10 @@ type debounceSearchMsg struct {
 	query string
 	id    int
 }
+
+// layerDebounceMsg fires once the user has stopped panning/zooming long
+// enough for a fresh Overpass fetch to be worthwhile. The id is matched
+// against [App.layerDebounceID] to discard stale ticks.
+type layerDebounceMsg struct {
+	id int
+}

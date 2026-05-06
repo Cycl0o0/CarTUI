@@ -76,6 +76,11 @@ type App struct {
 
 	heatmap bool
 
+	// layerDebounceID is incremented every time the viewport changes;
+	// only the most recent tick passes through layerDebounceMsg, so
+	// rapid pan/zoom keystrokes coalesce into a single fetch.
+	layerDebounceID int
+
 	notification    string
 	notificationExp time.Time
 
@@ -123,6 +128,17 @@ func (a *App) Init() tea.Cmd {
 	)
 }
 
+// scheduleLayerRefresh debounces the next Overpass fetch — typing several
+// pan/zoom keys quickly only triggers one round-trip after the user
+// settles. The debounce window matches the search field's.
+func (a *App) scheduleLayerRefresh() tea.Cmd {
+	a.layerDebounceID++
+	id := a.layerDebounceID
+	return tea.Tick(300*time.Millisecond, func(_ time.Time) tea.Msg {
+		return layerDebounceMsg{id: id}
+	})
+}
+
 // welcomeNotification shows a one-second splash-style status line.
 func welcomeNotification(t i18n.Strings) tea.Cmd {
 	return func() tea.Msg {
@@ -140,11 +156,14 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = m.Width
 		a.height = m.Height
 		a.recomputeViewport()
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 
 	case featuresLoadedMsg:
 		if m.err != nil {
-			return a, a.notify(a.t.NetworkError + ": " + m.err.Error())
+			// Keep the previously-loaded features visible. The user
+			// might still be panning around the cached area; a
+			// failure to refresh shouldn't blank the map.
+			return a, a.notify(a.t.NetworkError + " — affichage en cache")
 		}
 		a.features = m.collection
 		return a, nil
@@ -233,6 +252,12 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, fetchIncidents(a.bgCtx, a.deps.TomTom, a.viewport.BBox(), a.deps.Cfg.UI.Lang)
 
+	case layerDebounceMsg:
+		if m.id != a.layerDebounceID {
+			return a, nil
+		}
+		return a, a.refreshLayers()
+
 	case tea.KeyMsg:
 		return a.handleKey(m)
 	}
@@ -283,35 +308,35 @@ func (a *App) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyMatch(a.keys.ToggleSidebar, msg):
 		a.sidebar = !a.sidebar
 		a.recomputeViewport()
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.PanLeft, msg):
 		a.viewport.Pan(-2, 0)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.PanRight, msg):
 		a.viewport.Pan(2, 0)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.PanUp, msg):
 		a.viewport.Pan(0, -2)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.PanDown, msg):
 		a.viewport.Pan(0, 2)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.ZoomIn, msg):
 		a.viewport.SetZoom(a.viewport.Zoom + 1)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.ZoomOut, msg):
 		a.viewport.SetZoom(a.viewport.Zoom - 1)
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.Reset, msg):
 		a.viewport.Center = geo.LatLng{Lat: a.deps.Cfg.Map.DefaultLat, Lng: a.deps.Cfg.Map.DefaultLng}
 		a.viewport.Zoom = a.deps.Cfg.Map.DefaultZoom
-		return a, a.refreshLayers()
+		return a, a.scheduleLayerRefresh()
 	case keyMatch(a.keys.Center, msg):
 		// gg-style chord: 'g' once, then 'g' again to centre.
 		if a.prevKey == "g" {
 			a.viewport.Center = geo.LatLng{Lat: a.deps.Cfg.Map.DefaultLat, Lng: a.deps.Cfg.Map.DefaultLng}
 			a.prevKey = ""
-			return a, a.refreshLayers()
+			return a, a.scheduleLayerRefresh()
 		}
 		a.prevKey = "g"
 		return a, nil

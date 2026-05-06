@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -119,15 +120,35 @@ func run(ctx context.Context, f flags) error {
 	}
 	httpClient := providers.NewClient(clientOpts)
 	httpClient.SetRateLimit(hostOf(cfg.Providers.NominatimURL), cfg.Providers.Rate.NominatimRPS)
-	httpClient.SetRateLimit(hostOf(cfg.Providers.OverpassURL), cfg.Providers.Rate.OverpassRPS)
 	httpClient.SetRateLimit(hostOf(cfg.Providers.OSRMURL), cfg.Providers.Rate.OSRMRPS)
 	httpClient.SetRateLimit(hostOf(cfg.Providers.TileURL), cfg.Providers.Rate.TileRPS)
+	// Apply the Overpass rate limit to every endpoint in the rotation —
+	// hitting four mirrors round-robin still has to respect their
+	// individual fair-use policies.
+	overpassEndpoints := providers.DefaultOverpassEndpoints
+	if cfg.Providers.OverpassURL != "" {
+		overpassEndpoints = strings.Split(cfg.Providers.OverpassURL, ",")
+	}
+	for _, ep := range overpassEndpoints {
+		if h := hostOf(strings.TrimSpace(ep)); h != "" {
+			httpClient.SetRateLimit(h, cfg.Providers.Rate.OverpassRPS)
+		}
+	}
+
+	overpass := providers.NewOverpass(httpClient, cfg.Providers.OverpassURL)
+	if db != nil {
+		if cache, err := db.NewOverpassCache(cfg.OverpassTTL()); err == nil {
+			overpass.SetCache(cache, cfg.OverpassTTL())
+		} else {
+			logger.Warn("overpass cache unavailable", "err", err)
+		}
+	}
 
 	deps := tui.Deps{
 		Cfg:       cfg,
 		Store:     db,
 		Nominatim: providers.NewNominatim(httpClient, cfg.Providers.NominatimURL),
-		Overpass:  providers.NewOverpass(httpClient, cfg.Providers.OverpassURL),
+		Overpass:  overpass,
 		OSRM:      providers.NewOSRM(httpClient, cfg.Providers.OSRMURL),
 		TomTom:    providers.NewTomTom(httpClient, cfg.Providers.TomTomURL, cfg.Providers.TomTomAPIKey),
 	}

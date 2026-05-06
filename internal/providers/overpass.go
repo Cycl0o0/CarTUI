@@ -6,29 +6,89 @@ package providers
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/cycl0o0/cartui/internal/data"
 	"github.com/cycl0o0/cartui/internal/geo"
 )
 
+// DefaultOverpassEndpoints lists the public Overpass mirrors CarTUI tries
+// in order when the user does not pin a specific URL. Mirrors are picked
+// for known reliability and minimal abuse policies; ordering reflects
+// rough latency from Western Europe.
+var DefaultOverpassEndpoints = []string{
+	"https://overpass.private.coffee/api/interpreter",
+	"https://overpass-api.de/api/interpreter",
+	"https://overpass.kumi.systems/api/interpreter",
+	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+}
+
+// OverpassCache caches raw Overpass JSON responses keyed by the query +
+// bbox + zoom hash. Implementations live in `internal/store`.
+type OverpassCache interface {
+	Get(key string) ([]byte, bool)
+	Put(key string, data []byte)
+}
+
 // Overpass is a thin client around the Overpass QL HTTP endpoint. The
 // embedded query builder constructs viewport-bounded queries fitting the
 // CarTUI layer model (water/green/buildings/roads/POIs).
+//
+// The client maintains an *ordered* list of endpoints and falls back to
+// the next one on transport / 5xx / 429 errors. An optional cache short-
+// circuits the round-trip entirely.
 type Overpass struct {
-	client  *Client
-	baseURL string
+	client    *Client
+	endpoints []string
+	cache     OverpassCache
+	cacheTTL  time.Duration
 }
 
-// NewOverpass constructs a client. baseURL defaults to the public
-// Overpass-API instance when empty.
+// NewOverpass constructs a client. Pass an empty string to use the
+// built-in mirror list, or a comma-separated list / single URL to pin a
+// specific set.
 func NewOverpass(c *Client, baseURL string) *Overpass {
-	if baseURL == "" {
-		baseURL = "https://overpass-api.de/api/interpreter"
+	endpoints := splitEndpoints(baseURL)
+	if len(endpoints) == 0 {
+		endpoints = append([]string(nil), DefaultOverpassEndpoints...)
 	}
-	return &Overpass{client: c, baseURL: baseURL}
+	return &Overpass{client: c, endpoints: endpoints}
+}
+
+// SetCache attaches a cache layer with the given TTL. Cache hits are
+// served immediately; cache misses populate the cache after a successful
+// fetch.
+func (o *Overpass) SetCache(cache OverpassCache, ttl time.Duration) {
+	o.cache = cache
+	o.cacheTTL = ttl
+}
+
+// Endpoints returns the current ordered endpoint list — exposed for the
+// status bar.
+func (o *Overpass) Endpoints() []string { return o.endpoints }
+
+// splitEndpoints accepts either an empty string (use defaults), a single
+// URL, or a comma-separated list. Whitespace is trimmed.
+func splitEndpoints(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // QueryFeatures runs an Overpass QL statement and returns the contained
@@ -47,13 +107,60 @@ func (o *Overpass) QueryFeatures(ctx context.Context, bbox geo.BBox, body string
 	)
 	full := preamble + strings.TrimSpace(body) + "\nout body geom;\n"
 
-	var raw overpassResponse
-	headers := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
-	form := "data=" + escapeForm(full)
-	if err := o.client.RequestJSON(ctx, "POST", o.baseURL, headers, io.Reader(bytes.NewBufferString(form)), &raw); err != nil {
-		return data.FeatureCollection{}, fmt.Errorf("overpass: %w", err)
+	if o.cache != nil {
+		if blob, ok := o.cache.Get(cacheKey(full)); ok {
+			var raw overpassResponse
+			if err := json.Unmarshal(blob, &raw); err == nil {
+				return raw.toFeatures(), nil
+			}
+		}
 	}
-	return raw.toFeatures(), nil
+
+	headers := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
+	form := []byte("data=" + escapeForm(full))
+
+	var lastErr error
+	for _, endpoint := range o.endpoints {
+		if ctx.Err() != nil {
+			return data.FeatureCollection{}, ctx.Err()
+		}
+		blob, err := o.postRaw(ctx, endpoint, headers, form)
+		if err != nil {
+			slog.Debug("overpass endpoint failed",
+				"endpoint", endpoint, "err", err.Error())
+			lastErr = err
+			continue
+		}
+		var raw overpassResponse
+		if err := json.Unmarshal(blob, &raw); err != nil {
+			lastErr = fmt.Errorf("decode %s: %w", endpoint, err)
+			continue
+		}
+		if o.cache != nil {
+			o.cache.Put(cacheKey(full), blob)
+		}
+		return raw.toFeatures(), nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no overpass endpoint configured")
+	}
+	return data.FeatureCollection{}, fmt.Errorf("overpass: %w", lastErr)
+}
+
+// postRaw issues a single POST against one endpoint and returns the raw
+// response body. Used by the multi-endpoint loop.
+func (o *Overpass) postRaw(ctx context.Context, endpoint string, headers map[string]string, body []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := o.client.RequestRaw(ctx, "POST", endpoint, headers, bytes.NewReader(body), &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// cacheKey returns a deterministic key for an Overpass query body.
+func cacheKey(query string) string {
+	sum := sha1.Sum([]byte(query))
+	return "overpass:" + hex.EncodeToString(sum[:])
 }
 
 // FetchMapLayers asks Overpass for everything CarTUI needs to render a
@@ -72,8 +179,17 @@ func (o *Overpass) FetchPOIs(ctx context.Context, bbox geo.BBox, categories []da
 }
 
 // buildLayersQuery returns an Overpass QL fragment selecting the geometric
-// features required to draw the map.
+// features required to draw the map. Heavier feature classes are gated by
+// zoom level so the response stays small enough for an interactive TUI.
 func buildLayersQuery(zoom int) string {
+	// At low zoom only majors + water keeps the payload tiny.
+	if zoom < 13 {
+		return "(\n  " +
+			`way["highway"~"^(motorway|trunk|primary)(_link)?$"];` + "\n  " +
+			`way["natural"="water"];` + "\n  " +
+			`way["waterway"~"^(river|canal)$"];` + "\n  " +
+			`relation["natural"="water"];` + "\n);"
+	}
 	parts := []string{
 		`way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service|unclassified|living_street|pedestrian)(_link)?$"];`,
 		`way["waterway"];`,
@@ -82,12 +198,16 @@ func buildLayersQuery(zoom int) string {
 		`way["leisure"~"^(park|garden|nature_reserve)$"];`,
 		`relation["natural"="water"];`,
 	}
-	if zoom >= 14 {
+	// Buildings + admin boundaries explode the response size; only ask
+	// for them when the viewport is small enough to show useful detail.
+	if zoom >= 16 {
 		parts = append(parts,
 			`way["building"];`,
 			`relation["building"];`,
-			`way["boundary"="administrative"];`,
 		)
+	}
+	if zoom >= 14 {
+		parts = append(parts, `way["boundary"="administrative"];`)
 	}
 	return "(\n  " + strings.Join(parts, "\n  ") + "\n);"
 }

@@ -57,11 +57,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Overpass reliability**: every public mirror is flaky in different
+  ways. Three changes lift this:
+  - **Multi-endpoint fallback**: the client now tries
+    `private.coffee → overpass-api.de → kumi.systems → maps.mail.ru`
+    in order, falling through on transport, 5xx and 429 errors.
+  - **BoltDB response cache** (60-min default TTL) keyed by query SHA1.
+    Cache hits skip the network entirely; misses warm the cache after
+    the first successful fetch.
+  - **Pan/zoom debounce**: rapid keystrokes coalesce into a single
+    fetch 300ms after the user settles, instead of firing four
+    requests in 200ms.
+  - **Lighter queries by zoom**: at z<13 only majors+water are asked
+    for; buildings only at z≥16; boundaries at z≥14. Cuts response
+    size by ~10× at low zoom.
+  - On error the previously-loaded features stay rendered — no more
+    blank screens between flaky fetches.
 - Skip Overpass fetches below zoom 11 — over a continent-sized bbox
   the public endpoint reliably timed out. Client timeout brought down
   from 30s to 20s to surface failures earlier.
 - CI coverage profiling restricted to `internal/...` to avoid the
   GOCOVERDIR `covdata` tool requirement on the Go 1.22 runner.
+- CI lint job: bumped `golangci-lint-action` to v7 (v6 only supports
+  golangci-lint v1; we run v2.0.2 to support Go 1.25).
 
 ### Future
 
