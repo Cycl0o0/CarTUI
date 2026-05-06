@@ -140,21 +140,6 @@ func compactKeyHelp(k Keymap) string {
 	return strings.Join(parts, " · ")
 }
 
-// overlay centres an overlay box on top of an existing rendering. The
-// implementation is intentionally simple — Bubble Tea's terminal renderer
-// already handles the underlying clearing.
-func overlay(base, box string) string {
-	// Centred via JoinVertical — the box is opaque so it covers the body.
-	return lipgloss.JoinVertical(lipgloss.Center,
-		"",
-		box,
-		"",
-		lipgloss.NewStyle().Faint(true).Render("─── overlay (esc to close) ───"),
-		"",
-		base,
-	)
-}
-
 // keyMatch reports whether msg activates the binding.
 func keyMatch(b key.Binding, msg tea.KeyMsg) bool { return key.Matches(msg, b) }
 

@@ -500,23 +500,32 @@ func (a *App) View() string {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, mapStr, side)
 	}
 
-	out := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
-
+	// Overlay modes replace the body with a centred panel — keeping
+	// the header (showing the active mode) and the footer (key hints)
+	// visible. This gives the user a self-contained overlay screen
+	// without trying to alpha-composite text on top of the map, which
+	// is impossible without painting.
+	overlayBox := ""
 	switch a.mode {
 	case ModeSearch:
-		out = overlay(out, a.search.View(min(60, a.width-4), a.t))
+		overlayBox = a.search.View(min(60, a.width-4), a.t)
 	case ModePOI:
-		out = overlay(out, a.poi.View(min(60, a.width-4), a.t))
+		overlayBox = a.poi.View(min(60, a.width-4), a.t)
 	case ModeRoute:
-		out = overlay(out, a.rt.View(min(60, a.width-4), a.t))
+		overlayBox = a.rt.View(min(60, a.width-4), a.t)
 	case ModeHelp:
-		out = overlay(out, helpView(min(70, a.width-4), a.t, a.keys))
+		overlayBox = helpView(min(70, a.width-4), a.t, a.keys)
 	case ModeMeasure:
-		out = overlay(out, a.measure.View(min(60, a.width-4), a.t))
+		overlayBox = a.measure.View(min(60, a.width-4), a.t)
 	case ModeBookmarks:
-		out = overlay(out, a.bookmarks.View(min(60, a.width-4), a.t))
+		overlayBox = a.bookmarks.View(min(60, a.width-4), a.t)
 	}
-	return out
+	if overlayBox != "" {
+		body = lipgloss.Place(a.width, bodyHeight,
+			lipgloss.Center, lipgloss.Center, overlayBox)
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 }
 
 func (a *App) sidebarWidth() int {
