@@ -103,8 +103,11 @@ func pmFeatureRenderable(f data.Feature) bool {
 		return false
 	case "places":
 		// Country/region polygons are huge fills with no visual signal;
-		// we'd want point labels but don't render them yet either.
-		return false
+		// keep only point features (cities, towns, neighbourhoods —
+		// rendered as labels by the TUI).
+		if f.Geometry.Kind == data.GeometryPolygon {
+			return false
+		}
 	case "landuse":
 		switch f.Tags["kind"] {
 		case "residential", "commercial", "industrial", "urban_area":

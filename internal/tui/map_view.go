@@ -34,6 +34,11 @@ func renderMap(v Viewport, theme render.Theme, ascii bool, fc data.FeatureCollec
 	}
 	drawMeasurePolyline(c, v, measurePoints)
 	drawMarkers(c, v, markers)
+	// Labels are rendered last so they sit on top of geometry but
+	// underneath POI markers / traffic glyphs (canvas layer priority
+	// handles the actual conflict resolution).
+	drawLabels(c, v, fc)
+	drawLabels(c, v, pois)
 	if cfg.Heatmap {
 		drawHeatmap(c, v, pois)
 	}
