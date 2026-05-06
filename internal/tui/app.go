@@ -546,9 +546,13 @@ func (a *App) refreshLayers() tea.Cmd {
 	if a.deps.MapSource == nil {
 		return nil
 	}
-	_, isPMTiles := a.deps.MapSource.(*providers.PMTilesSource)
+	tileBased := false
+	switch a.deps.MapSource.(type) {
+	case *providers.PMTilesSource, *providers.MapboxSource:
+		tileBased = true
+	}
 	bbox := a.viewport.BBox().Expand(0.001, 0.001)
-	return fetchMapLayers(a.bgCtx, a.deps.MapSource, bbox, a.viewport.Zoom, isPMTiles)
+	return fetchMapLayers(a.bgCtx, a.deps.MapSource, bbox, a.viewport.Zoom, tileBased)
 }
 
 func (a *App) addBookmark() tea.Cmd {

@@ -46,15 +46,18 @@ func renderMap(v Viewport, theme render.Theme, ascii bool, fc data.FeatureCollec
 }
 
 // fetchMapLayers schedules a fetch from the configured [providers.MapSource].
-// PMTiles is range-fetched (no minimum-zoom cliff) while Overpass is
-// gated below z11 to avoid continent-sized queries that always time out.
-func fetchMapLayers(ctx context.Context, src providers.MapSource, b geo.BBox, zoom int, isPMTiles bool) tea.Cmd {
+// Tile-based backends (PMTiles, Mapbox) work at any zoom because they
+// only fetch the visible tiles. Overpass on the other hand answers a
+// single bbox query — at zoom < 11 the bbox is the size of a small
+// country and the public endpoints reliably time out, so we
+// short-circuit those calls.
+func fetchMapLayers(ctx context.Context, src providers.MapSource, b geo.BBox, zoom int, tileBased bool) tea.Cmd {
 	if src == nil {
 		return func() tea.Msg {
 			return featuresLoadedMsg{collection: data.FeatureCollection{}}
 		}
 	}
-	if !isPMTiles && zoom < 11 {
+	if !tileBased && zoom < 11 {
 		return func() tea.Msg {
 			return featuresLoadedMsg{collection: data.FeatureCollection{}}
 		}
