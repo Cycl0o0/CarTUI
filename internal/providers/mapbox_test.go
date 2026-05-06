@@ -98,17 +98,49 @@ func TestMapboxPOIClassRewrite(t *testing.T) {
 func TestMapboxFeatureRenderableFiltersUrbanLanduse(t *testing.T) {
 	for _, class := range []string{"residential", "commercial", "industrial"} {
 		f := data.Feature{Tags: data.OSMTags{"__layer": "landuse", "class": class}}
-		assert.False(t, mapboxFeatureRenderable(f))
+		assert.False(t, mapboxFeatureRenderable(f, 14))
 	}
 
-	// `park` survives.
+	// `park` survives at any zoom (≥ 11 in our viewport heuristics).
 	f := data.Feature{Tags: data.OSMTags{"__layer": "landuse", "class": "park"}}
-	assert.True(t, mapboxFeatureRenderable(f))
+	assert.True(t, mapboxFeatureRenderable(f, 14))
 }
 
 func TestMapboxHouseNumLabelDropped(t *testing.T) {
 	f := data.Feature{Tags: data.OSMTags{"__layer": "housenum_label"}}
-	assert.False(t, mapboxFeatureRenderable(f))
+	assert.False(t, mapboxFeatureRenderable(f, 18))
+}
+
+func TestMapboxZoomAwareFiltering(t *testing.T) {
+	// Buildings only appear from z=14.
+	building := data.Feature{Tags: data.OSMTags{"__layer": "building"}}
+	assert.False(t, mapboxFeatureRenderable(building, 12))
+	assert.True(t, mapboxFeatureRenderable(building, 14))
+
+	// Neighbourhood labels only from z=13.
+	hood := data.Feature{Tags: data.OSMTags{"__layer": "place_label", "type": "neighbourhood"}}
+	assert.False(t, mapboxFeatureRenderable(hood, 11))
+	assert.True(t, mapboxFeatureRenderable(hood, 13))
+
+	// City labels survive even at low zoom.
+	city := data.Feature{Tags: data.OSMTags{"__layer": "place_label", "type": "city"}}
+	assert.True(t, mapboxFeatureRenderable(city, 7))
+
+	// Minor roads only from z=14.
+	service := data.Feature{Tags: data.OSMTags{"__layer": "road", "class": "service"}}
+	assert.False(t, mapboxFeatureRenderable(service, 12))
+	assert.True(t, mapboxFeatureRenderable(service, 14))
+
+	// At very low zoom only major roads survive.
+	primary := data.Feature{Tags: data.OSMTags{"__layer": "road", "class": "primary"}}
+	tertiary := data.Feature{Tags: data.OSMTags{"__layer": "road", "class": "tertiary"}}
+	assert.True(t, mapboxFeatureRenderable(primary, 8))
+	assert.False(t, mapboxFeatureRenderable(tertiary, 8))
+
+	// PoIs only from z=12.
+	poi := data.Feature{Tags: data.OSMTags{"__layer": "poi_label", "class": "food_and_drink"}}
+	assert.False(t, mapboxFeatureRenderable(poi, 10))
+	assert.True(t, mapboxFeatureRenderable(poi, 13))
 }
 
 func TestMapboxRoadLabelKeepsName(t *testing.T) {

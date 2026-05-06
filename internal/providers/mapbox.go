@@ -112,15 +112,8 @@ func (m *MapboxSource) FetchMapLayers(ctx context.Context, bbox geo.BBox, zoom i
 				continue
 			}
 			for _, f := range tileFC.Features {
-				if !mapboxFeatureRenderable(f) {
+				if !mapboxFeatureRenderable(f, z) {
 					continue
-				}
-				// Zoom-aware road thinning: drop minor classes when
-				// the viewport is wide enough that they'd just smear.
-				if z < 14 && f.Tags["__layer"] == "road" {
-					if _, minor := minorRoadClasses[f.Tags["class"]]; minor {
-						continue
-					}
 				}
 				rewriteMapboxFeature(&f)
 				fc.Features = append(fc.Features, f)
@@ -171,33 +164,135 @@ func isGzipMagic(b []byte) bool {
 	return len(b) >= 2 && b[0] == 0x1f && b[1] == 0x8b
 }
 
-// mapboxFeatureRenderable filters the same dominating-fill features
-// that we drop from Protomaps, but expressed in Mapbox Streets v8
-// vocabulary.
-func mapboxFeatureRenderable(f data.Feature) bool {
-	switch f.Tags["__layer"] {
+// mapboxFeatureRenderable filters the dominating-fill features that
+// would visually overload the TUI canvas. The rules are zoom-aware
+// because a feature class that is meaningful at z=15 (a single
+// hospital, an individual cafe) becomes noise at z=8 where it's too
+// small to render usefully and overlaps everything else.
+//
+// Tiers (cumulative):
+//   - z < 11: only motorway/primary roads, water, country/state names,
+//     major landuse like parks (no buildings, no PoI, no neighbourhoods)
+//   - z 11-12: + secondary roads, town/city labels, larger landuse
+//   - z 13: + smaller roads, all place labels, all landuse, POIs
+//   - z 14-15: + buildings, all transit stops, every road class
+func mapboxFeatureRenderable(f data.Feature, zoom int) bool {
+	layer := f.Tags["__layer"]
+	class := f.Tags["class"]
+
+	// Always-dropped layers regardless of zoom.
+	switch layer {
+	case "structure":
+		return false
+	case "housenum_label":
+		return false
+	}
+
+	switch layer {
 	case "landuse":
-		switch f.Tags["class"] {
+		switch class {
 		case "residential", "commercial", "industrial":
 			return false
 		}
-	case "structure":
-		// Bridges, tunnels, retaining walls, dams. At TUI resolution
-		// they cluster into noisy polygons that hide the road network
-		// without adding signal. Drop them all.
-		return false
-	case "housenum_label":
-		// House numbers are too dense to render usefully in a TUI.
-		return false
+		// Small institutional landuses are dots at z<13.
+		if zoom < 13 {
+			switch class {
+			case "school", "hospital", "cemetery":
+				return false
+			}
+		}
+	case "building":
+		// Building footprints are unreadable below z=14.
+		if zoom < 14 {
+			return false
+		}
+	case "road":
+		if _, minor := minorRoadClasses[class]; minor {
+			if zoom < 14 {
+				return false
+			}
+		}
+		if zoom < 11 {
+			// Only major arterials at low zoom.
+			switch class {
+			case "motorway", "motorway_link", "trunk", "trunk_link",
+				"primary", "primary_link":
+				return true
+			}
+			return false
+		}
+	case "road_label":
+		// Same gating as `road` so road labels match what we drew.
+		if _, minor := minorRoadClasses[class]; minor && zoom < 14 {
+			return false
+		}
+	case "place_label":
+		// `type` is the place hierarchy (city/town/village/...).
+		t := f.Tags["type"]
+		if t == "" {
+			t = class
+		}
+		if zoom < 7 {
+			switch t {
+			case "country", "region", "state":
+				return true
+			}
+			return false
+		}
+		if zoom < 10 {
+			switch t {
+			case "country", "region", "state", "city":
+				return true
+			}
+			return false
+		}
+		if zoom < 12 {
+			switch t {
+			case "country", "region", "state", "city", "town":
+				return true
+			}
+			return false
+		}
+		if zoom < 13 {
+			switch t {
+			case "country", "region", "state", "city", "town", "village":
+				return true
+			}
+			return false
+		}
+		// z >= 13: all place types, including neighbourhood/suburb.
+	case "poi_label":
+		// PoIs at low zoom are pure noise.
+		if zoom < 12 {
+			return false
+		}
 	case "transit_stop_label":
-		// Mapbox emits one feature per bus/tram stop — at z>=14 that's
-		// hundreds per viewport. Render only rail stations (kept by
-		// rewriteMapboxFeature → railway=station).
-		switch f.Tags["class"] {
+		// Always limit to rail-grade stops (heavy infrastructure);
+		// bus stops would saturate the canvas. At low zoom even
+		// rail stops are dropped.
+		if zoom < 11 {
+			return false
+		}
+		switch class {
 		case "rail", "rail_metro", "ferry":
 			return true
 		}
 		return false
+	case "natural_label":
+		if zoom < 11 {
+			return false
+		}
+	case "motorway_junction":
+		// Exit numbers — only useful when the user is close enough to
+		// see individual junctions.
+		if zoom < 13 {
+			return false
+		}
+	case "aeroway":
+		// Runways/taxiways — only useful at airports, very specific use.
+		if zoom < 12 {
+			return false
+		}
 	}
 	return true
 }

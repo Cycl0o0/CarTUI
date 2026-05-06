@@ -75,7 +75,7 @@ func (p *PMTilesSource) FetchMapLayers(ctx context.Context, bbox geo.BBox, zoom 
 				continue
 			}
 			for _, f := range tileFC.Features {
-				if !pmFeatureRenderable(f) {
+				if !pmFeatureRenderable(f, z) {
 					continue
 				}
 				rewritePMFeature(&f)
@@ -86,38 +86,115 @@ func (p *PMTilesSource) FetchMapLayers(ctx context.Context, bbox geo.BBox, zoom 
 	return fc, nil
 }
 
-// pmFeatureRenderable filters out Protomaps features that would visually
-// dominate the canvas without conveying useful information at TUI
-// resolution.
+// pmFeatureRenderable filters out Protomaps features that would
+// visually dominate the canvas without conveying useful information
+// at TUI resolution. The rules are zoom-aware: small features that
+// are meaningful at z=15 become noise at z=8 because they overlap
+// each other and the rest of the map.
 //
 // In particular the `earth` layer is a single polygon covering the
 // entire tile — when painted on top of everything else it blanks the
 // whole map. `landuse` polygons with continent-spanning categories
 // (residential / commercial / industrial) have the same effect at low
 // zoom and are dropped too.
-func pmFeatureRenderable(f data.Feature) bool {
-	switch f.Tags["__layer"] {
+func pmFeatureRenderable(f data.Feature, zoom int) bool {
+	layer := f.Tags["__layer"]
+	kind := f.Tags["kind"]
+
+	switch layer {
 	case "earth":
-		// Always skip; the rest of the rendering pipeline already
-		// assumes a transparent background.
 		return false
 	case "places":
-		// Country/region polygons are huge fills with no visual signal;
-		// keep only point features (cities, towns, neighbourhoods —
-		// rendered as labels by the TUI).
 		if f.Geometry.Kind == data.GeometryPolygon {
 			return false
 		}
+		// At low zoom, only render major place markers.
+		if zoom < 7 {
+			switch kind {
+			case "country", "region", "state":
+				return true
+			}
+			return false
+		}
+		if zoom < 10 {
+			switch kind {
+			case "country", "region", "state", "city":
+				return true
+			}
+			return false
+		}
+		if zoom < 12 {
+			switch kind {
+			case "country", "region", "state", "city", "macrohood",
+				"town":
+				return true
+			}
+			return false
+		}
+		if zoom < 13 {
+			switch kind {
+			case "country", "region", "state", "city", "macrohood",
+				"town", "village":
+				return true
+			}
+			return false
+		}
+		// z >= 13: also neighbourhood, suburb, locality.
 	case "landuse":
-		switch f.Tags["kind"] {
+		switch kind {
 		case "residential", "commercial", "industrial", "urban_area":
 			return false
 		}
+		// Small institutional landuse is a dot at low zoom.
+		if zoom < 13 {
+			switch kind {
+			case "school", "hospital", "cemetery":
+				return false
+			}
+		}
+	case "buildings":
+		// Building footprints are unreadable at TUI zoom-out.
+		if zoom < 14 {
+			return false
+		}
+	case "roads":
+		// Protomaps uses the `kind` attribute for road class.
+		if zoom < 11 {
+			switch kind {
+			case "highway", "major_road":
+				return true
+			}
+			return false
+		}
+		if zoom < 13 {
+			switch kind {
+			case "highway", "major_road", "medium_road":
+				return true
+			}
+			return false
+		}
+		// z >= 13: include minor_road, path, rail.
+	case "pois":
+		if zoom < 12 {
+			return false
+		}
+	case "transit":
+		if zoom < 11 {
+			return false
+		}
 	case "natural":
-		// `natural` polygons in Protomaps include `wood` blobs that
-		// cover entire forests — keep them only when the geometry is
-		// reasonably bounded (skipping when zoom is low is enough as
-		// the tile-local cap already restricts size).
+		// At low zoom we keep natural=water but drop tiny green blobs.
+		if zoom < 11 {
+			switch kind {
+			case "grass", "scrub":
+				return false
+			}
+		}
+	case "boundaries":
+		// Admin boundaries at low zoom = country borders only.
+		if zoom < 8 {
+			return false
+		}
 	}
 	return true
 }
