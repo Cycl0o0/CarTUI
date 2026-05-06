@@ -76,6 +76,7 @@ func newRootCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&f.versionOut, "version", "V", false, "print version and exit")
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newPrefetchCmd())
+	cmd.AddCommand(newSetupCmd())
 	return cmd
 }
 
