@@ -16,6 +16,19 @@ import (
 	"github.com/cycl0o0/cartui/internal/geo"
 )
 
+// minorRoadClasses are road classes filtered at zoom < 14 to keep the
+// canvas legible — Mapbox Streets v8 emits ~4× more road features than
+// Protomaps and most of them are unnamed service/path/track entries.
+var minorRoadClasses = map[string]struct{}{
+	"service":      {},
+	"service_link": {},
+	"track":        {},
+	"path":         {},
+	"footway":      {},
+	"cycleway":     {},
+	"pedestrian":   {},
+}
+
 // MapboxSource fetches Mapbox Streets v8 vector tiles via the Mapbox
 // Vector Tiles API. The free tier allows 50k requests per month — a
 // generous budget given that one viewport refresh typically uses 4-9
@@ -102,6 +115,13 @@ func (m *MapboxSource) FetchMapLayers(ctx context.Context, bbox geo.BBox, zoom i
 				if !mapboxFeatureRenderable(f) {
 					continue
 				}
+				// Zoom-aware road thinning: drop minor classes when
+				// the viewport is wide enough that they'd just smear.
+				if z < 14 && f.Tags["__layer"] == "road" {
+					if _, minor := minorRoadClasses[f.Tags["class"]]; minor {
+						continue
+					}
+				}
 				rewriteMapboxFeature(&f)
 				fc.Features = append(fc.Features, f)
 			}
@@ -161,8 +181,22 @@ func mapboxFeatureRenderable(f data.Feature) bool {
 		case "residential", "commercial", "industrial":
 			return false
 		}
+	case "structure":
+		// Bridges, tunnels, retaining walls, dams. At TUI resolution
+		// they cluster into noisy polygons that hide the road network
+		// without adding signal. Drop them all.
+		return false
 	case "housenum_label":
 		// House numbers are too dense to render usefully in a TUI.
+		return false
+	case "transit_stop_label":
+		// Mapbox emits one feature per bus/tram stop — at z>=14 that's
+		// hundreds per viewport. Render only rail stations (kept by
+		// rewriteMapboxFeature → railway=station).
+		switch f.Tags["class"] {
+		case "rail", "rail_metro", "ferry":
+			return true
+		}
 		return false
 	}
 	return true
