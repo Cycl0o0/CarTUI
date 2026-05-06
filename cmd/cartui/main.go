@@ -144,9 +144,9 @@ func run(ctx context.Context, f flags) error {
 		}
 	}
 
-	// MapSource priority: PMTiles → Mapbox → Overpass. The first one
-	// configured wins. PMTiles archives are opened eagerly so the user
-	// sees a clear startup error rather than a silent fallback.
+	// MapSource priority: PMTiles → Mapbox → OpenFreeMap → Overpass.
+	// PMTiles archives are opened eagerly so the user sees a clear
+	// startup error rather than a silent fallback.
 	var mapSource providers.MapSource = overpass
 	switch {
 	case cfg.Providers.PMTilesURL != "":
@@ -174,6 +174,13 @@ func run(ctx context.Context, f flags) error {
 			logger.Info("map source: mapbox",
 				"tileset", cfg.Providers.MapboxTileset)
 		}
+	case cfg.Providers.OpenFreeMapURL != "":
+		ctxBoot, cancelBoot := context.WithTimeout(ctx, 8*time.Second)
+		mapSource = providers.NewOpenFreeMapSource(ctxBoot, httpClient,
+			cfg.Providers.OpenFreeMapURL, 16)
+		cancelBoot()
+		logger.Info("map source: openfreemap",
+			"url", cfg.Providers.OpenFreeMapURL)
 	}
 
 	deps := tui.Deps{
