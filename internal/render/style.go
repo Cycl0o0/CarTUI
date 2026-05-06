@@ -19,6 +19,7 @@ type Layer uint8
 // when multiple layers paint the same terminal cell.
 const (
 	LayerBackground Layer = iota
+	LayerHeatmap
 	LayerWater
 	LayerGreen
 	LayerBuilding
@@ -29,6 +30,7 @@ const (
 	LayerRoadMotorway
 	LayerLabel
 	LayerPOI
+	LayerTraffic
 	LayerRoute
 	LayerMarker
 )
@@ -73,10 +75,12 @@ type Theme struct {
 	RoadSecondary   Color
 	RoadResidential Color
 
-	POI    Color
-	Route  Color
-	Marker Color
-	Label  Color
+	POI     Color
+	Route   Color
+	Marker  Color
+	Label   Color
+	Heatmap Color // base hue; rendered code applies a density-derived gradient
+	Traffic Color // base hue; rendered code applies a severity gradient
 }
 
 // ColorFor returns the dominant colour for the given layer.
@@ -106,6 +110,10 @@ func (t Theme) ColorFor(l Layer) Color {
 		return t.Marker
 	case LayerLabel:
 		return t.Label
+	case LayerHeatmap:
+		return t.Heatmap
+	case LayerTraffic:
+		return t.Traffic
 	case LayerBackground:
 		return t.Background
 	default:
@@ -130,6 +138,8 @@ var DarkTheme = Theme{
 	Route:           Color{0, 200, 220},
 	Marker:          Color{255, 80, 80},
 	Label:           Color{240, 240, 240},
+	Heatmap:         Color{255, 120, 0},
+	Traffic:         Color{255, 60, 60},
 }
 
 // LightTheme inverts the brightness for bright terminal backgrounds.
@@ -149,6 +159,8 @@ var LightTheme = Theme{
 	Route:           Color{0, 150, 170},
 	Marker:          Color{220, 30, 30},
 	Label:           Color{20, 20, 20},
+	Heatmap:         Color{220, 120, 0},
+	Traffic:         Color{220, 30, 30},
 }
 
 // MonoTheme strips colour but keeps layer priorities. Useful with NO_COLOR or
@@ -168,6 +180,8 @@ var MonoTheme = Theme{
 	Route:           Color{255, 255, 255},
 	Marker:          Color{255, 255, 255},
 	Label:           Color{255, 255, 255},
+	Heatmap:         Color{200, 200, 200},
+	Traffic:         Color{255, 255, 255},
 }
 
 // ThemeByName looks up a built-in theme by case-insensitive name. Falls back

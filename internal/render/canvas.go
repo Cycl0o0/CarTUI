@@ -27,3 +27,40 @@ func (c *Canvas) CellAt(cx, cy int) (dots uint8, layer Layer, glyph rune, color 
 	cl := c.cells[cy*c.widthCells+cx]
 	return cl.dots, cl.layer, cl.glyph, cl.color
 }
+
+// PaintCell writes a custom dot pattern at (cellX, cellY) with the given
+// layer. The colour is taken from the active theme. Unlike [Canvas.FillCell]
+// it lets the caller pick the dot density — useful when a single 8-dot block
+// is too visually heavy.
+//
+// The cell is only updated when layer ≥ existing layer; lower-priority
+// requests are silently dropped.
+func (c *Canvas) PaintCell(cellX, cellY int, dots uint8, layer Layer) {
+	if cellX < 0 || cellX >= c.widthCells || cellY < 0 || cellY >= c.heightCells {
+		return
+	}
+	cl := &c.cells[cellY*c.widthCells+cellX]
+	if layer < cl.layer {
+		return
+	}
+	cl.dots |= dots
+	cl.layer = layer
+	cl.color = c.theme.ColorFor(layer)
+}
+
+// PaintCellWithColor is like [Canvas.PaintCell] but uses an explicit colour
+// instead of the layer's theme colour. Used by colour-gradient renderers
+// (heatmaps, traffic flow) where the meaning is encoded in the colour
+// itself.
+func (c *Canvas) PaintCellWithColor(cellX, cellY int, dots uint8, layer Layer, color Color) {
+	if cellX < 0 || cellX >= c.widthCells || cellY < 0 || cellY >= c.heightCells {
+		return
+	}
+	cl := &c.cells[cellY*c.widthCells+cellX]
+	if layer < cl.layer {
+		return
+	}
+	cl.dots |= dots
+	cl.layer = layer
+	cl.color = color
+}

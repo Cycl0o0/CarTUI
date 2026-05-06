@@ -113,10 +113,12 @@ default_zoom = 13
 braille = true           # false -> ASCII fallback
 
 [providers]
-nominatim_url = "https://nominatim.openstreetmap.org/"
-overpass_url  = "https://overpass-api.de/api/interpreter"
-osrm_url      = "https://router.project-osrm.org/"
-osrm_profile  = "driving"
+nominatim_url   = "https://nominatim.openstreetmap.org/"
+overpass_url    = "https://overpass.private.coffee/api/interpreter"
+osrm_url        = "https://router.project-osrm.org/"
+osrm_profile    = "driving"
+tomtom_url      = "https://api.tomtom.com"
+tomtom_api_key  = ""                       # paste your free TomTom dev key to enable traffic
 
 [providers.rate]
 nominatim_rps = 1.0

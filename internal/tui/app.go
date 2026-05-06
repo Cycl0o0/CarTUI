@@ -43,6 +43,7 @@ type Deps struct {
 	Nominatim *providers.Nominatim
 	Overpass  *providers.Overpass
 	OSRM      *providers.OSRM
+	TomTom    *providers.TomTom // nil when no API key is configured
 }
 
 // App is the root Bubble Tea model.
@@ -71,6 +72,9 @@ type App struct {
 	measure   measureModel
 	bookmarks bookmarkModel
 	gps       gpsState
+	traffic   trafficState
+
+	heatmap bool
 
 	notification    string
 	notificationExp time.Time
@@ -212,6 +216,23 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, pollGPS(a.bgCtx)
 
+	case trafficLoadedMsg:
+		if m.err != nil {
+			return a, tea.Batch(a.notify("Trafic: "+m.err.Error()), a.rescheduleTraffic())
+		}
+		a.traffic.incidents = m.incidents
+		a.traffic.updatedAt = time.Now()
+		return a, tea.Batch(
+			a.notify(fmt.Sprintf("Trafic: %d incident(s)", len(m.incidents))),
+			a.rescheduleTraffic(),
+		)
+
+	case trafficTickMsg:
+		if !a.traffic.enabled {
+			return a, nil
+		}
+		return a, fetchIncidents(a.bgCtx, a.deps.TomTom, a.viewport.BBox(), a.deps.Cfg.UI.Lang)
+
 	case tea.KeyMsg:
 		return a.handleKey(m)
 	}
@@ -308,9 +329,36 @@ func (a *App) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	case msg.String() == "G":
 		return a, a.startGPS()
+	case msg.String() == "H":
+		a.heatmap = !a.heatmap
+		if a.heatmap {
+			return a, a.notify("Heatmap PoI activée")
+		}
+		return a, a.notify("Heatmap PoI désactivée")
+	case msg.String() == "T":
+		return a, a.toggleTraffic()
 	}
 	a.prevKey = msg.String()
 	return a, nil
+}
+
+// toggleTraffic enables or disables the traffic overlay. When enabling, a
+// fetch is kicked off immediately; the next refresh is scheduled by the
+// trafficLoadedMsg handler.
+func (a *App) toggleTraffic() tea.Cmd {
+	a.traffic.enabled = !a.traffic.enabled
+	if !a.traffic.enabled {
+		a.traffic.incidents = nil
+		return a.notify("Trafic désactivé")
+	}
+	if a.deps.TomTom == nil {
+		a.traffic.enabled = false
+		return a.notify("TomTom non configuré (providers.tomtom_api_key)")
+	}
+	return tea.Batch(
+		a.notify("Trafic: récupération…"),
+		fetchIncidents(a.bgCtx, a.deps.TomTom, a.viewport.BBox(), a.deps.Cfg.UI.Lang),
+	)
 }
 
 func (a *App) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -414,7 +462,11 @@ func (a *App) View() string {
 		bodyHeight = 1
 	}
 
-	mapStr := renderMap(a.viewport, a.theme, a.ascii, a.features, a.pois, a.route, a.markers, a.measure.points)
+	mapStr := renderMap(a.viewport, a.theme, a.ascii, a.features, a.pois, a.route, a.markers, a.measure.points,
+		renderConfig{
+			Heatmap:   a.heatmap,
+			Incidents: a.traffic.incidents,
+		})
 
 	body := mapStr
 	if a.sidebar {

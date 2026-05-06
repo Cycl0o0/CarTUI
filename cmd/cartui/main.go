@@ -129,6 +129,7 @@ func run(ctx context.Context, f flags) error {
 		Nominatim: providers.NewNominatim(httpClient, cfg.Providers.NominatimURL),
 		Overpass:  providers.NewOverpass(httpClient, cfg.Providers.OverpassURL),
 		OSRM:      providers.NewOSRM(httpClient, cfg.Providers.OSRMURL),
+		TomTom:    providers.NewTomTom(httpClient, cfg.Providers.TomTomURL, cfg.Providers.TomTomAPIKey),
 	}
 
 	if f.gotoQuery != "" {

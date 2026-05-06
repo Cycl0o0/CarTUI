@@ -40,6 +40,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `127.0.0.1:2947`, recentre on each fix every 2 seconds.
 - **Offline prefetch** subcommand: `cartui prefetch --bbox … --zoom …`
   warms the raster tile cache for fully-offline browsing later.
+- **POI density heatmap** (`H`): blue→red 5-stop gradient over the
+  currently-loaded POIs, painted only on otherwise-empty cells.
+- **Real-time traffic** (`T`): TomTom Traffic Incidents v5 overlay,
+  refreshed every 60s while enabled. Requires a free dev API key in
+  `providers.tomtom_api_key`.
+
+### Changed
+
+- Default Overpass endpoint switched to
+  `https://overpass.private.coffee/api/interpreter` (less rate-limited
+  than the public OSM-hosted instance).
+- CI Go matrix bumped to 1.24/1.25 to match the version required by
+  `bubbles v1.0.0`. golangci-lint upgraded to v2.x with a migrated
+  config file.
 
 ### Fixed
 
@@ -53,8 +67,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Out of scope for this release; PRs welcome:
 
-- Heatmap of POI density per zoom.
 - Mapillary Street-View → ASCII art viewer.
 - Bookmark sync via WebDAV / Nextcloud.
-- Real-time traffic overlays (TomTom or HERE).
+- HERE traffic backend as an alternative to TomTom.
 - Configurable keymap from `config.toml`.

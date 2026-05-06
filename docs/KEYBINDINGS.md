@@ -51,6 +51,26 @@ the help screen and the update loop never drift apart.
 While follow mode is on, the viewport recentres on the latest fix every
 two seconds. Disable by pressing `G` again.
 
+## POI heatmap (`H`)
+
+| Key   | Action                                          |
+| ----- | ----------------------------------------------- |
+| `H`   | Toggle POI density heatmap on the current view  |
+
+Cells with no other map feature drawn are colour-coded from blue (sparse)
+to red (densest cluster) using a 5-stop gradient. Fetch POIs first via the
+`p` menu — the heatmap is computed from whatever is currently loaded.
+
+## Traffic (`T`)
+
+| Key   | Action                                                |
+| ----- | ----------------------------------------------------- |
+| `T`   | Toggle real-time TomTom traffic incidents overlay     |
+
+Requires a TomTom developer API key in the config (free tier). Incidents
+refresh every 60 seconds while the overlay is on. Severity colours:
+yellow (minor), orange (moderate), red (major), magenta (closure).
+
 ## Search mode (`/`)
 
 | Key       | Action                                 |

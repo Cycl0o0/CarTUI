@@ -39,6 +39,11 @@ type Providers struct {
 	OSRMProfile  string `mapstructure:"osrm_profile"`
 	TileURL      string `mapstructure:"tile_url"`
 
+	// TomTom is the optional traffic data provider. Leave APIKey empty
+	// to disable traffic features at runtime.
+	TomTomURL    string `mapstructure:"tomtom_url"`
+	TomTomAPIKey string `mapstructure:"tomtom_api_key"`
+
 	Rate ProvidersRate `mapstructure:"rate"`
 }
 
@@ -91,13 +96,14 @@ func Defaults() Config {
 		},
 		Providers: Providers{
 			NominatimURL: "https://nominatim.openstreetmap.org/",
-			OverpassURL:  "https://overpass-api.de/api/interpreter",
+			OverpassURL:  "https://overpass.private.coffee/api/interpreter",
 			OSRMURL:      "https://router.project-osrm.org/",
 			OSRMProfile:  "driving",
 			TileURL:      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+			TomTomURL:    "https://api.tomtom.com",
 			Rate: ProvidersRate{
 				NominatimRPS: 1.0,
-				OverpassRPS:  0.5,
+				OverpassRPS:  1.0,
 				OSRMRPS:      5.0,
 				TileRPS:      2.0,
 			},
@@ -180,6 +186,8 @@ func bindDefaults(v *viper.Viper, cfg Config) {
 	v.SetDefault("providers.osrm_url", cfg.Providers.OSRMURL)
 	v.SetDefault("providers.osrm_profile", cfg.Providers.OSRMProfile)
 	v.SetDefault("providers.tile_url", cfg.Providers.TileURL)
+	v.SetDefault("providers.tomtom_url", cfg.Providers.TomTomURL)
+	v.SetDefault("providers.tomtom_api_key", cfg.Providers.TomTomAPIKey)
 	v.SetDefault("providers.rate.nominatim_rps", cfg.Providers.Rate.NominatimRPS)
 	v.SetDefault("providers.rate.overpass_rps", cfg.Providers.Rate.OverpassRPS)
 	v.SetDefault("providers.rate.osrm_rps", cfg.Providers.Rate.OSRMRPS)

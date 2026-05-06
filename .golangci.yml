@@ -1,9 +1,11 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - gosec
@@ -12,50 +14,54 @@ linters:
     - unparam
     - unused
     - staticcheck
-    - gosimple
     - ineffassign
     - govet
-    - gofmt
-    - goimports
     - misspell
     - bodyclose
     - errorlint
     - prealloc
 
-linters-settings:
-  revive:
-    severity: warning
+  settings:
+    revive:
+      severity: warning
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: package-comments
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: unused-parameter
+          disabled: true
+    gosec:
+      excludes:
+        - G104
+        - G304
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+
+  exclusions:
     rules:
-      - name: exported
-      - name: var-naming
-      - name: package-comments
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: receiver-naming
-      - name: indent-error-flow
-      - name: superfluous-else
-      - name: unused-parameter
-        disabled: true
-  gosec:
-    excludes:
-      - G104  # Errors unhandled (covered by errcheck)
-      - G304  # Potential file inclusion via variable (false positives in TUI)
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-    disabled-checks:
-      - hugeParam
-      - rangeValCopy
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - gocritic
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
-        - gocritic
   max-same-issues: 50
   max-issues-per-linter: 100
