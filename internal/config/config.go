@@ -51,6 +51,13 @@ type Providers struct {
 	// faster and works offline once the file is local.
 	PMTilesURL string `mapstructure:"pmtiles_url"`
 
+	// MapboxToken is a Mapbox public access token. When non-empty (and
+	// PMTilesURL is empty) Mapbox Streets v8 vector tiles are used as
+	// the map source. 50k tile requests/month free.
+	MapboxToken   string `mapstructure:"mapbox_token"`
+	MapboxTileset string `mapstructure:"mapbox_tileset"`
+	MapboxURL     string `mapstructure:"mapbox_url"`
+
 	Rate ProvidersRate `mapstructure:"rate"`
 }
 
@@ -182,6 +189,9 @@ func bindDefaults(v *viper.Viper, cfg Config) {
 	v.SetDefault("providers.tomtom_url", cfg.Providers.TomTomURL)
 	v.SetDefault("providers.tomtom_api_key", cfg.Providers.TomTomAPIKey)
 	v.SetDefault("providers.pmtiles_url", cfg.Providers.PMTilesURL)
+	v.SetDefault("providers.mapbox_token", cfg.Providers.MapboxToken)
+	v.SetDefault("providers.mapbox_tileset", cfg.Providers.MapboxTileset)
+	v.SetDefault("providers.mapbox_url", cfg.Providers.MapboxURL)
 	v.SetDefault("providers.rate.nominatim_rps", cfg.Providers.Rate.NominatimRPS)
 	v.SetDefault("providers.rate.overpass_rps", cfg.Providers.Rate.OverpassRPS)
 	v.SetDefault("providers.rate.osrm_rps", cfg.Providers.Rate.OSRMRPS)

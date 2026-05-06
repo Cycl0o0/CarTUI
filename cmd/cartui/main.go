@@ -144,23 +144,35 @@ func run(ctx context.Context, f flags) error {
 		}
 	}
 
-	// MapSource: PMTiles takes precedence when configured. The
-	// archive is opened eagerly so the user gets a quick failure
-	// rather than a silent fallback at the first pan.
+	// MapSource priority: PMTiles → Mapbox → Overpass. The first one
+	// configured wins. PMTiles archives are opened eagerly so the user
+	// sees a clear startup error rather than a silent fallback.
 	var mapSource providers.MapSource = overpass
-	if url := cfg.Providers.PMTilesURL; url != "" {
+	switch {
+	case cfg.Providers.PMTilesURL != "":
 		ctxBoot, cancelBoot := context.WithTimeout(ctx, 10*time.Second)
-		archive, err := providers.NewPMTiles(ctxBoot, httpClient, url)
+		archive, err := providers.NewPMTiles(ctxBoot, httpClient, cfg.Providers.PMTilesURL)
 		cancelBoot()
 		if err != nil {
-			logger.Warn("pmtiles unavailable; falling back to overpass", "err", err)
+			logger.Warn("pmtiles unavailable; falling back", "err", err)
 		} else {
 			defer func() { _ = archive.Close() }()
 			mapSource = providers.NewPMTilesSource(archive, 64)
-			logger.Info("pmtiles source ready",
-				"url", url,
+			logger.Info("map source: pmtiles",
+				"url", cfg.Providers.PMTilesURL,
 				"min_zoom", archive.Header().MinZoom,
 				"max_zoom", archive.Header().MaxZoom)
+		}
+	case cfg.Providers.MapboxToken != "":
+		mb := providers.NewMapboxSource(httpClient,
+			cfg.Providers.MapboxURL,
+			cfg.Providers.MapboxTileset,
+			cfg.Providers.MapboxToken,
+			16)
+		if mb != nil {
+			mapSource = mb
+			logger.Info("map source: mapbox",
+				"tileset", cfg.Providers.MapboxTileset)
 		}
 	}
 
