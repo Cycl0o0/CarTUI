@@ -75,12 +75,48 @@ func (p *PMTilesSource) FetchMapLayers(ctx context.Context, bbox geo.BBox, zoom 
 				continue
 			}
 			for _, f := range tileFC.Features {
+				if !pmFeatureRenderable(f) {
+					continue
+				}
 				rewritePMFeature(&f)
 				fc.Features = append(fc.Features, f)
 			}
 		}
 	}
 	return fc, nil
+}
+
+// pmFeatureRenderable filters out Protomaps features that would visually
+// dominate the canvas without conveying useful information at TUI
+// resolution.
+//
+// In particular the `earth` layer is a single polygon covering the
+// entire tile — when painted on top of everything else it blanks the
+// whole map. `landuse` polygons with continent-spanning categories
+// (residential / commercial / industrial) have the same effect at low
+// zoom and are dropped too.
+func pmFeatureRenderable(f data.Feature) bool {
+	switch f.Tags["__layer"] {
+	case "earth":
+		// Always skip; the rest of the rendering pipeline already
+		// assumes a transparent background.
+		return false
+	case "places":
+		// Country/region polygons are huge fills with no visual signal;
+		// we'd want point labels but don't render them yet either.
+		return false
+	case "landuse":
+		switch f.Tags["kind"] {
+		case "residential", "commercial", "industrial", "urban_area":
+			return false
+		}
+	case "natural":
+		// `natural` polygons in Protomaps include `wood` blobs that
+		// cover entire forests — keep them only when the geometry is
+		// reasonably bounded (skipping when zoom is low is enough as
+		// the tile-local cap already restricts size).
+	}
+	return true
 }
 
 // rewritePMFeature injects the OSM-shaped tags that CarTUI's layer logic

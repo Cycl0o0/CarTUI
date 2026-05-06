@@ -90,14 +90,30 @@ func (v Viewport) MetersPerCell() float64 {
 // rendering based on geometry kind.
 func drawFeatures(c *render.Canvas, v Viewport, fc data.FeatureCollection) {
 	// Two passes: areas first (water/green/buildings), then linear features
-	// on top (roads/boundaries). This avoids fills overpainting roads.
+	// on top (roads/boundaries).
+	//
+	// Water polygons are painted full-density — they are meant to feel
+	// solid. Other area features (parks, forests, buildings) use a
+	// sparse dotted fill so that roads drawn on top remain visible.
 	for _, f := range fc.Features {
 		if f.Geometry.Kind != data.GeometryPolygon {
 			continue
 		}
 		layer := f.Tags.Layer()
+		// LayerLabel is the fallback for tags that did not match any
+		// known layer — drawing polygons at LayerLabel paints them on
+		// top of every other feature and visually blanks the map.
+		// Skip polygons we don't know how to colour.
+		if layer == render.LayerLabel {
+			continue
+		}
 		pts := projectPoints(v, f.Geometry.Points)
-		c.FillPolygon(pts, layer)
+		switch layer {
+		case render.LayerWater:
+			c.FillPolygon(pts, layer)
+		default:
+			c.FillPolygonSparse(pts, layer, 3)
+		}
 	}
 	for _, f := range fc.Features {
 		switch f.Geometry.Kind {

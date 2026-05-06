@@ -94,3 +94,87 @@ func (c *Canvas) FillRect(x0, y0, x1, y1 int, layer Layer) {
 		}
 	}
 }
+
+// FillPolygonSparse fills a polygon while leaving most pixels in each
+// terminal cell empty. The visual effect is a tinted dotted pattern
+// suitable for "background" features (parks, forests, buildings) that
+// must be visible without overpowering line features drawn on top.
+//
+// `step` controls the period of painted pixels. step=2 means every
+// second pixel along each axis is set — about a quarter of the dots
+// per cell on average. step=3 paints roughly one ninth of the dots,
+// etc. Values ≤ 1 fall back to [Canvas.FillPolygon].
+func (c *Canvas) FillPolygonSparse(points []Point, layer Layer, step int) {
+	if step <= 1 {
+		c.FillPolygon(points, layer)
+		return
+	}
+	if len(points) < 3 {
+		return
+	}
+
+	minY, maxY := points[0].Y, points[0].Y
+	for _, p := range points[1:] {
+		if p.Y < minY {
+			minY = p.Y
+		}
+		if p.Y > maxY {
+			maxY = p.Y
+		}
+	}
+	if minY < 0 {
+		minY = 0
+	}
+	if maxY >= c.heightPx {
+		maxY = c.heightPx - 1
+	}
+
+	xs := make([]int, 0, len(points))
+	for y := minY; y <= maxY; y++ {
+		if y%step != 0 {
+			continue
+		}
+		xs = xs[:0]
+		for i := 0; i < len(points); i++ {
+			a := points[i]
+			b := points[(i+1)%len(points)]
+			if a.Y == b.Y {
+				continue
+			}
+			yMin, yMax := a.Y, b.Y
+			if yMin > yMax {
+				yMin, yMax = yMax, yMin
+			}
+			if y < yMin || y >= yMax {
+				continue
+			}
+			x := a.X + (y-a.Y)*(b.X-a.X)/(b.Y-a.Y)
+			xs = append(xs, x)
+		}
+		if len(xs) < 2 {
+			continue
+		}
+		// Sort xs ascending.
+		for i := 1; i < len(xs); i++ {
+			for j := i; j > 0 && xs[j-1] > xs[j]; j-- {
+				xs[j-1], xs[j] = xs[j], xs[j-1]
+			}
+		}
+		for i := 0; i+1 < len(xs); i += 2 {
+			x1 := xs[i]
+			x2 := xs[i+1]
+			if x2 < 0 || x1 >= c.widthPx {
+				continue
+			}
+			if x1 < 0 {
+				x1 = 0
+			}
+			if x2 >= c.widthPx {
+				x2 = c.widthPx - 1
+			}
+			for x := x1; x <= x2; x += step {
+				c.Set(x, y, layer)
+			}
+		}
+	}
+}
