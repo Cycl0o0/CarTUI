@@ -80,9 +80,12 @@ func runSetup() error {
 	fmt.Printf("✓ Configuration enregistrée dans %s\n", path)
 	if res.Choice == setup.ChoiceOfflinePBF {
 		fmt.Println()
-		fmt.Println("⚠ La source hors-ligne n'est pas encore complètement implémentée.")
-		fmt.Println("  Cette release accepte le choix mais retombe sur OpenFreeMap au démarrage.")
-		fmt.Println("  Le téléchargement + indexation PBF arrivera dans une prochaine version.")
+		fmt.Println("Pour activer la source hors-ligne, lance :")
+		fmt.Println()
+		fmt.Println("    cartui pbf-download aquitaine     # ou: france / europe / planet")
+		fmt.Println()
+		fmt.Println("Ça télécharge l'extract PBF et écrit `providers.pbf_path` dans ta config.")
+		fmt.Println("Le prochain `cartui` chargera la base locale en RAM (pas de réseau ensuite).")
 	}
 	return nil
 }
@@ -98,6 +101,7 @@ func applySetupResult(cfg *config.Config, r setup.Result) {
 	cfg.Providers.MapboxToken = ""
 	cfg.Providers.OpenFreeMapURL = ""
 	cfg.Providers.OverpassURL = ""
+	cfg.Providers.PBFPath = ""
 
 	switch r.Choice {
 	case setup.ChoiceOpenFreeMap:
@@ -112,8 +116,9 @@ func applySetupResult(cfg *config.Config, r setup.Result) {
 	case setup.ChoiceOverpassLocal:
 		cfg.Providers.OverpassURL = r.OverpassURL
 	case setup.ChoiceOfflinePBF:
-		// Until offline PBF is implemented, fall back to OpenFreeMap and
-		// stash the chosen region for future versions to consume.
+		// The setup screen records the region name only; the actual
+		// PBF download is deferred to `cartui pbf-download <region>`.
+		// We seed OpenFreeMap as a sensible fallback in the meantime.
 		cfg.Providers.OpenFreeMapURL = "https://tiles.openfreemap.org/planet"
 	}
 }
@@ -152,6 +157,7 @@ func writeConfigTOML(path string, cfg config.Config) error {
 	writeStringField(&b, "mapbox_tileset", cfg.Providers.MapboxTileset)
 	writeStringField(&b, "mapbox_url", cfg.Providers.MapboxURL)
 	writeStringField(&b, "openfreemap_url", cfg.Providers.OpenFreeMapURL)
+	writeStringField(&b, "pbf_path", cfg.Providers.PBFPath)
 	b.WriteString("\n")
 
 	b.WriteString("[providers.rate]\n")

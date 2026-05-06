@@ -77,6 +77,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newPrefetchCmd())
 	cmd.AddCommand(newSetupCmd())
+	cmd.AddCommand(newPBFDownloadCmd())
 	return cmd
 }
 
@@ -145,11 +146,34 @@ func run(ctx context.Context, f flags) error {
 		}
 	}
 
-	// MapSource priority: PMTiles → Mapbox → OpenFreeMap → Overpass.
-	// PMTiles archives are opened eagerly so the user sees a clear
-	// startup error rather than a silent fallback.
+	// MapSource priority: local PBF → PMTiles → Mapbox → OpenFreeMap →
+	// Overpass. Local resources take precedence because they are both
+	// faster and less prone to upstream flakiness.
 	var mapSource providers.MapSource = overpass
 	switch {
+	case cfg.Providers.PBFPath != "":
+		fmt.Fprintf(os.Stderr, "loading offline OSM database from %s …\n", cfg.Providers.PBFPath)
+		ctxBoot, cancelBoot := context.WithTimeout(ctx, 30*time.Minute)
+		pbf, stats, err := providers.LoadPBF(ctxBoot, cfg.Providers.PBFPath, func(read, total int64) {
+			pct := 0.0
+			if total > 0 {
+				pct = float64(read) / float64(total) * 100
+			}
+			fmt.Fprintf(os.Stderr, "\r  %.0f%% (%d/%d MB)        ", pct, read>>20, total>>20)
+		})
+		cancelBoot()
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			logger.Warn("pbf unavailable; falling back", "err", err)
+		} else {
+			mapSource = pbf
+			logger.Info("map source: pbf",
+				"path", cfg.Providers.PBFPath,
+				"features", stats.Features,
+				"grid_cells", stats.GridCells)
+			fmt.Fprintf(os.Stderr, "✓ %d features indexed (%d grid cells)\n",
+				stats.Features, stats.GridCells)
+		}
 	case cfg.Providers.PMTilesURL != "":
 		ctxBoot, cancelBoot := context.WithTimeout(ctx, 10*time.Second)
 		archive, err := providers.NewPMTiles(ctxBoot, httpClient, cfg.Providers.PMTilesURL)

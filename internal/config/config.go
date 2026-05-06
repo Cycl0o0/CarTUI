@@ -63,6 +63,12 @@ type Providers struct {
 	// no key, no quota. Empty to disable.
 	OpenFreeMapURL string `mapstructure:"openfreemap_url"`
 
+	// PBFPath points to a local OSM PBF file (Geofabrik regional
+	// extract or planet dump). When set, the file is loaded into RAM
+	// at startup and queried locally — fully offline, lowest latency,
+	// at the cost of init time + memory proportional to the region.
+	PBFPath string `mapstructure:"pbf_path"`
+
 	Rate ProvidersRate `mapstructure:"rate"`
 }
 
@@ -199,6 +205,7 @@ func bindDefaults(v *viper.Viper, cfg Config) {
 	v.SetDefault("providers.mapbox_tileset", cfg.Providers.MapboxTileset)
 	v.SetDefault("providers.mapbox_url", cfg.Providers.MapboxURL)
 	v.SetDefault("providers.openfreemap_url", cfg.Providers.OpenFreeMapURL)
+	v.SetDefault("providers.pbf_path", cfg.Providers.PBFPath)
 	v.SetDefault("providers.rate.nominatim_rps", cfg.Providers.Rate.NominatimRPS)
 	v.SetDefault("providers.rate.overpass_rps", cfg.Providers.Rate.OverpassRPS)
 	v.SetDefault("providers.rate.osrm_rps", cfg.Providers.Rate.OSRMRPS)

@@ -5,6 +5,7 @@ package tui
 
 import (
 	"github.com/cycl0o0/cartui/internal/data"
+	"github.com/cycl0o0/cartui/internal/geo"
 	"github.com/cycl0o0/cartui/internal/render"
 )
 
@@ -28,7 +29,7 @@ func drawLabels(c *render.Canvas, v Viewport, fc data.FeatureCollection) {
 		if f.Geometry.Kind != data.GeometryPoint {
 			continue
 		}
-		if f.Tags["__layer"] != "places" {
+		if !isPlaceLayer(f.Tags["__layer"]) {
 			continue
 		}
 		if f.Name == "" {
@@ -52,25 +53,137 @@ func drawLabels(c *render.Canvas, v Viewport, fc data.FeatureCollection) {
 		placeRoadLabel(c, v, tracker, f)
 	}
 
-	// Pass 3: POIs. Limit to keep the viewport readable.
-	const maxPOILabels = 24
+	// Pass 3: institutional polygons (schools, hospitals, parks, malls,
+	// hotels, museums…). At z>=13 these are big enough to warrant a
+	// centroid label. We do this BEFORE point POIs so a named building
+	// claims its centroid before a small amenity dot tries to sit there.
+	if v.Zoom >= 13 {
+		for _, f := range fc.Features {
+			if f.Geometry.Kind != data.GeometryPolygon {
+				continue
+			}
+			if f.Name == "" {
+				continue
+			}
+			if !isInstitutionalPolygon(f.Tags) {
+				continue
+			}
+			placePolygonLabel(c, v, tracker, f, 22)
+		}
+	}
+
+	// Pass 4: POIs. Cap scales with zoom — at city-block scale we want
+	// every named establishment, not just the first 24.
+	poiCap := 24
+	switch {
+	case v.Zoom >= 16:
+		poiCap = 200
+	case v.Zoom >= 15:
+		poiCap = 120
+	case v.Zoom >= 14:
+		poiCap = 60
+	}
 	poiLabels := 0
 	for _, f := range fc.Features {
 		if f.Geometry.Kind != data.GeometryPoint {
 			continue
 		}
-		if f.Tags["__layer"] != "pois" {
+		if !isPOILayer(f.Tags["__layer"]) {
 			continue
 		}
 		if f.Name == "" {
 			continue
 		}
-		if poiLabels >= maxPOILabels {
+		if poiLabels >= poiCap {
 			break
 		}
 		if placePOILabel(c, v, tracker, f) {
 			poiLabels++
 		}
+	}
+}
+
+// isPlaceLayer matches the place-label layer name across the three
+// supported tile schemas (Protomaps `places`, Mapbox `place_label`,
+// OpenMapTiles/OpenFreeMap `place`).
+func isPlaceLayer(name string) bool {
+	switch name {
+	case "places", "place_label", "place":
+		return true
+	}
+	return false
+}
+
+// isPOILayer matches the POI layer name across the three supported
+// tile schemas (Protomaps `pois`, Mapbox `poi_label`, OpenMapTiles
+// `poi`).
+func isPOILayer(name string) bool {
+	switch name {
+	case "pois", "poi_label", "poi":
+		return true
+	}
+	return false
+}
+
+// isInstitutionalPolygon reports whether a named polygon represents an
+// establishment whose name is worth surfacing on the map: schools,
+// hospitals, malls, parks, hotels, museums, sports venues, places of
+// worship, town halls, etc. The check is permissive — any feature
+// carrying an amenity / shop / tourism / leisure / building tag with a
+// non-trivial value qualifies.
+func isInstitutionalPolygon(t data.OSMTags) bool {
+	if t.Has("amenity") {
+		return true
+	}
+	if t.Has("shop") {
+		return true
+	}
+	if t.Has("tourism") {
+		return true
+	}
+	if t.Has("leisure") {
+		return true
+	}
+	if t.Has("aeroway") {
+		return true
+	}
+	switch t.Get("building") {
+	case "school", "university", "college", "hospital", "church",
+		"cathedral", "mosque", "temple", "synagogue", "stadium",
+		"train_station", "transportation", "civic", "government",
+		"public":
+		return true
+	}
+	return false
+}
+
+// placePolygonLabel computes the centroid of a polygon and drops the
+// feature's name there. Used for institutional polygons (schools, parks…).
+func placePolygonLabel(c *render.Canvas, v Viewport, t *labelTracker, f data.Feature, maxLen int) {
+	pts := f.Geometry.Points
+	if len(pts) == 0 {
+		return
+	}
+	var sumLat, sumLng float64
+	for _, p := range pts {
+		sumLat += p.Lat
+		sumLng += p.Lng
+	}
+	centroid := geo.LatLng{
+		Lat: sumLat / float64(len(pts)),
+		Lng: sumLng / float64(len(pts)),
+	}
+	cx, cy := v.LatLngToCell(centroid)
+	if cx < 0 {
+		return
+	}
+	label := truncate(f.Name, maxLen)
+	startX := cx - len(label)/2
+	if startX < 0 {
+		startX = 0
+	}
+	if t.tryReserve(startX, cy, label) {
+		c.PutString(startX, cy, label, render.LayerLabel)
 	}
 }
 

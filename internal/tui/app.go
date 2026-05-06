@@ -557,7 +557,8 @@ func (a *App) refreshLayers() tea.Cmd {
 	}
 	tileBased := false
 	switch a.deps.MapSource.(type) {
-	case *providers.PMTilesSource, *providers.MapboxSource, *providers.OpenFreeMapSource:
+	case *providers.PMTilesSource, *providers.MapboxSource,
+		*providers.OpenFreeMapSource, *providers.PBFSource:
 		tileBased = true
 	}
 	bbox := a.viewport.BBox().Expand(0.001, 0.001)
